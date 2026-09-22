@@ -1,0 +1,841 @@
+{
+  "source": "python-switch_catalog",
+  "rapidfuzzAvailable": true,
+  "filename": [
+    {
+      "fileName": "The Legend of Zelda - Breath of the Wild.nsp",
+      "supported": false,
+      "detectVersion": "",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "The Legend of Zelda Breath of the Wild",
+      "cleanedTitleForUpdate": "The Legend of Zelda Breath of the Wild",
+      "updateGroup": "Updates",
+      "versionSuffix": "",
+      "rawVersion": 0
+    },
+    {
+      "fileName": "Super Mario Odyssey [0100000000010000][v0].nsp",
+      "supported": false,
+      "detectVersion": "0",
+      "titleId": "0100000000010000",
+      "titleIdFamily": "010000000001",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "Super Mario Odyssey",
+      "cleanedTitleForUpdate": "Super Mario Odyssey",
+      "updateGroup": "Updates",
+      "versionSuffix": " (v0) (v0.0)",
+      "rawVersion": 0
+    },
+    {
+      "fileName": "Super Mario Odyssey [0100000000010800][v65536].nsp",
+      "supported": false,
+      "detectVersion": "65536",
+      "titleId": "0100000000010800",
+      "titleIdFamily": "010000000001",
+      "isUpdateOrDlc": true,
+      "cleanedTitle": "Super Mario Odyssey",
+      "cleanedTitleForUpdate": "Super Mario Odyssey",
+      "updateGroup": "Updates",
+      "versionSuffix": " (v65536) (v1.0)",
+      "rawVersion": 65536
+    },
+    {
+      "fileName": "Game Update v65536.nsp",
+      "supported": false,
+      "detectVersion": "65536",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": true,
+      "cleanedTitle": "Game",
+      "cleanedTitleForUpdate": "Game",
+      "updateGroup": "Updates",
+      "versionSuffix": " (v65536) (v1.0)",
+      "rawVersion": 65536
+    },
+    {
+      "fileName": "Some Game [DLC] v1.2.3.nsz",
+      "supported": false,
+      "detectVersion": "1.2.3",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": true,
+      "cleanedTitle": "Some Game",
+      "cleanedTitleForUpdate": "Some Game",
+      "updateGroup": "DLC",
+      "versionSuffix": " (v66051) (v1.2.3)",
+      "rawVersion": 66051
+    },
+    {
+      "fileName": "Pokémon™ Scarlet – The Hidden Treasure of Area Zero.xci",
+      "supported": false,
+      "detectVersion": "",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "Pokémon™ Scarlet – The Hidden Treasure of Area Zero",
+      "cleanedTitleForUpdate": "Pokémon™ Scarlet – The Hidden Treasure of Area Zero",
+      "updateGroup": "Updates",
+      "versionSuffix": "",
+      "rawVersion": 0
+    },
+    {
+      "fileName": "USA Zelda EUR Repack v0.nsp",
+      "supported": false,
+      "detectVersion": "",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "Zelda v0",
+      "cleanedTitleForUpdate": "Zelda v0",
+      "updateGroup": "Updates",
+      "versionSuffix": "",
+      "rawVersion": 0
+    },
+    {
+      "fileName": "0100ABCDEF123456.nsp",
+      "supported": false,
+      "detectVersion": "",
+      "titleId": "0100ABCDEF123456",
+      "titleIdFamily": "0100ABCDEF12",
+      "isUpdateOrDlc": true,
+      "cleanedTitle": "",
+      "cleanedTitleForUpdate": "",
+      "updateGroup": "DLC",
+      "versionSuffix": "",
+      "rawVersion": 0
+    },
+    {
+      "fileName": "Mario Kart 8 Deluxe [v3.0.1] (USA).xci",
+      "supported": false,
+      "detectVersion": "3.0.1",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "Mario Kart 8 Deluxe",
+      "cleanedTitleForUpdate": "Mario Kart 8 Deluxe",
+      "updateGroup": "Updates",
+      "versionSuffix": " (v196609) (v3.0.1)",
+      "rawVersion": 196609
+    },
+    {
+      "fileName": "Untitled_game-update-v131072.nsp",
+      "supported": false,
+      "detectVersion": "131072",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": true,
+      "cleanedTitle": "Untitled game",
+      "cleanedTitleForUpdate": "Untitled game",
+      "updateGroup": "Updates",
+      "versionSuffix": " (v131072) (v2.0)",
+      "rawVersion": 131072
+    },
+    {
+      "fileName": "Dragon Ball Z - Kakarot v1.0.0.nsp",
+      "supported": false,
+      "detectVersion": "1.0.0",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "Dragon Ball Z Kakarot",
+      "cleanedTitleForUpdate": "Dragon Ball Z Kakarot",
+      "updateGroup": "Updates",
+      "versionSuffix": " (v65536) (v1.0.0)",
+      "rawVersion": 65536
+    },
+    {
+      "fileName": "Hades.nsz",
+      "supported": false,
+      "detectVersion": "",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "Hades",
+      "cleanedTitleForUpdate": "Hades",
+      "updateGroup": "Updates",
+      "versionSuffix": "",
+      "rawVersion": 0
+    },
+    {
+      "fileName": "Hades [0100A3A0149EC800][v131072][UPD].nsp",
+      "supported": false,
+      "detectVersion": "131072",
+      "titleId": "0100A3A0149EC800",
+      "titleIdFamily": "0100A3A0149E",
+      "isUpdateOrDlc": true,
+      "cleanedTitle": "Hades",
+      "cleanedTitleForUpdate": "Hades",
+      "updateGroup": "Updates",
+      "versionSuffix": " (v131072) (v2.0)",
+      "rawVersion": 131072
+    },
+    {
+      "fileName": "Animal Crossing New Horizons 2.0.6.nsp",
+      "supported": false,
+      "detectVersion": "2.0.6",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "Animal Crossing New Horizons",
+      "cleanedTitleForUpdate": "Animal Crossing New Horizons",
+      "updateGroup": "Updates",
+      "versionSuffix": " (v131078) (v2.0.6)",
+      "rawVersion": 131078
+    },
+    {
+      "fileName": "Splatoon 3 [DLC] Wave 1.nsp",
+      "supported": false,
+      "detectVersion": "",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": true,
+      "cleanedTitle": "Splatoon 3 Wave 1",
+      "cleanedTitleForUpdate": "Splatoon 3 Wave 1",
+      "updateGroup": "DLC",
+      "versionSuffix": "",
+      "rawVersion": 0
+    },
+    {
+      "fileName": "Metroid Dread (World) (En,Fr,De) [010093801237C000].nsz",
+      "supported": false,
+      "detectVersion": "",
+      "titleId": "010093801237C000",
+      "titleIdFamily": "010093801237",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "Metroid Dread",
+      "cleanedTitleForUpdate": "Metroid Dread",
+      "updateGroup": "Updates",
+      "versionSuffix": "",
+      "rawVersion": 0
+    },
+    {
+      "fileName": "Xenoblade Chronicles 3 v2.1.0 [update].nsp",
+      "supported": false,
+      "detectVersion": "2.1.0",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": true,
+      "cleanedTitle": "Xenoblade Chronicles 3",
+      "cleanedTitleForUpdate": "Xenoblade Chronicles 3",
+      "updateGroup": "Updates",
+      "versionSuffix": " (v131328) (v2.1.0)",
+      "rawVersion": 131328
+    },
+    {
+      "fileName": "Just Dance 2024 Edition.nsp",
+      "supported": false,
+      "detectVersion": "2024",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "Just Dance Edition",
+      "cleanedTitleForUpdate": "Just Dance Edition",
+      "updateGroup": "Updates",
+      "versionSuffix": " (v132644864) (v2024.0)",
+      "rawVersion": 132644864
+    },
+    {
+      "fileName": "Sonic Frontiers - Digital Deluxe.nsp",
+      "supported": false,
+      "detectVersion": "",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "Sonic Frontiers Digital Deluxe",
+      "cleanedTitleForUpdate": "Sonic Frontiers Digital Deluxe",
+      "updateGroup": "Updates",
+      "versionSuffix": "",
+      "rawVersion": 0
+    },
+    {
+      "fileName": "NotAGame.txt",
+      "supported": false,
+      "detectVersion": "",
+      "titleId": "",
+      "titleIdFamily": "",
+      "isUpdateOrDlc": false,
+      "cleanedTitle": "NotAGame",
+      "cleanedTitleForUpdate": "NotAGame",
+      "updateGroup": "Updates",
+      "versionSuffix": "",
+      "rawVersion": 0
+    }
+  ],
+  "matching": [
+    {
+      "updateFileName": "Super Mario Odyssey [v65536].nsp",
+      "gameFileNames": [
+        "Super Mario Odyssey.nsp"
+      ],
+      "updateTitle": "super mario odyssey",
+      "titleIdMatch": {
+        "gameId": null,
+        "confidence": 0.0
+      },
+      "bestMatch": {
+        "gameId": 1,
+        "confidence": 1.0
+      },
+      "scores": [
+        {
+          "gameId": 1,
+          "score": 1.0
+        }
+      ]
+    },
+    {
+      "updateFileName": "Super Mario Odyssey [v65536].nsp",
+      "gameFileNames": [
+        "Super Mario Odyssey.nsp",
+        "Super Mario 3D All-Stars.nsp"
+      ],
+      "updateTitle": "super mario odyssey",
+      "titleIdMatch": {
+        "gameId": null,
+        "confidence": 0.0
+      },
+      "bestMatch": {
+        "gameId": 1,
+        "confidence": 1.0
+      },
+      "scores": [
+        {
+          "gameId": 1,
+          "score": 1.0
+        },
+        {
+          "gameId": 2,
+          "score": 0.6976744186046511
+        }
+      ]
+    },
+    {
+      "updateFileName": "Some Game [DLC] v1.2.3.nsz",
+      "gameFileNames": [
+        "Some Game.nsp",
+        "Other Game.nsz"
+      ],
+      "updateTitle": "some game",
+      "titleIdMatch": {
+        "gameId": null,
+        "confidence": 0.0
+      },
+      "bestMatch": {
+        "gameId": 1,
+        "confidence": 1.0
+      },
+      "scores": [
+        {
+          "gameId": 1,
+          "score": 1.0
+        },
+        {
+          "gameId": 2,
+          "score": 0.736842105263158
+        }
+      ]
+    },
+    {
+      "updateFileName": "Unknown Thing v131072.nsp",
+      "gameFileNames": [
+        "Hades.nsz"
+      ],
+      "updateTitle": "unknown thing",
+      "titleIdMatch": {
+        "gameId": null,
+        "confidence": 0.0
+      },
+      "bestMatch": {
+        "gameId": 1,
+        "confidence": 0.11111111111111116
+      },
+      "scores": [
+        {
+          "gameId": 1,
+          "score": 0.11111111111111116
+        }
+      ]
+    },
+    {
+      "updateFileName": "Hades [0100A3A0149EC800][v131072][UPD].nsp",
+      "gameFileNames": [
+        "Hades.nsz"
+      ],
+      "updateTitle": "hades",
+      "titleIdMatch": {
+        "gameId": null,
+        "confidence": 0.0
+      },
+      "bestMatch": {
+        "gameId": 1,
+        "confidence": 1.0
+      },
+      "scores": [
+        {
+          "gameId": 1,
+          "score": 1.0
+        }
+      ]
+    },
+    {
+      "updateFileName": "Mario Kart 8 Deluxe v3.0.1.nsp",
+      "gameFileNames": [
+        "Mario Kart 8 Deluxe.nsp",
+        "Mario Kart 8 Deluxe - Booster Course Pass.nsp"
+      ],
+      "updateTitle": "mario kart 8 deluxe",
+      "titleIdMatch": {
+        "gameId": null,
+        "confidence": 0.0
+      },
+      "bestMatch": {
+        "gameId": 1,
+        "confidence": 1.0
+      },
+      "scores": [
+        {
+          "gameId": 1,
+          "score": 1.0
+        },
+        {
+          "gameId": 2,
+          "score": 0.6551724137931035
+        }
+      ]
+    },
+    {
+      "updateFileName": "Zelda Update v1.0.0.nsp",
+      "gameFileNames": [
+        "The Legend of Zelda - Tears of the Kingdom.nsp",
+        "Zelda.nsp"
+      ],
+      "updateTitle": "zelda",
+      "titleIdMatch": {
+        "gameId": null,
+        "confidence": 0.0
+      },
+      "bestMatch": {
+        "gameId": 2,
+        "confidence": 1.0
+      },
+      "scores": [
+        {
+          "gameId": 1,
+          "score": 0.2222222222222222
+        },
+        {
+          "gameId": 2,
+          "score": 1.0
+        }
+      ]
+    },
+    {
+      "updateFileName": "Animal Crossing New Horizons 2.0.6.nsp",
+      "gameFileNames": [
+        "Animal Crossing New Horizons.nsp"
+      ],
+      "updateTitle": "animal crossing new horizons",
+      "titleIdMatch": {
+        "gameId": null,
+        "confidence": 0.0
+      },
+      "bestMatch": {
+        "gameId": 1,
+        "confidence": 1.0
+      },
+      "scores": [
+        {
+          "gameId": 1,
+          "score": 1.0
+        }
+      ]
+    },
+    {
+      "updateFileName": "Splatoon 3 v1.0.0.nsp",
+      "gameFileNames": [
+        "Splatoon 3.nsp"
+      ],
+      "updateTitle": "splatoon 3",
+      "titleIdMatch": {
+        "gameId": null,
+        "confidence": 0.0
+      },
+      "bestMatch": {
+        "gameId": 1,
+        "confidence": 1.0
+      },
+      "scores": [
+        {
+          "gameId": 1,
+          "score": 1.0
+        }
+      ]
+    },
+    {
+      "updateFileName": "TOTK Update.nsp",
+      "gameFileNames": [
+        "The Legend of Zelda - Tears of the Kingdom.nsp"
+      ],
+      "updateTitle": "totk",
+      "titleIdMatch": {
+        "gameId": null,
+        "confidence": 0.0
+      },
+      "bestMatch": {
+        "gameId": 1,
+        "confidence": 0.18181818181818177
+      },
+      "scores": [
+        {
+          "gameId": 1,
+          "score": 0.18181818181818177
+        }
+      ]
+    }
+  ],
+  "versions": {
+    "dotted": {
+      "0": "0.0.0",
+      "255": "0.0.255",
+      "256": "0.1.0",
+      "65536": "1.0.0",
+      "131072": "2.0.0",
+      "196608": "3.0.0",
+      "16777216": "256.0.0"
+    },
+    "labels": {
+      "0": "v0 (0.0.0)",
+      "65536": "v65536 (1.0.0)",
+      "131072": "v131072 (2.0.0)",
+      "196608": "v196608 (3.0.0)"
+    },
+    "releasedLabels": {
+      "65536": "v65536 (1.0.0) (2023-05-12)",
+      "131072": "v131072 (2.0.0) (2023-05-12)"
+    },
+    "fileVersionNumbers": {
+      "v0": 0,
+      "v65536": 65536,
+      "v1.0.0": 65536,
+      "1.0": 65536,
+      "2.1.0": 131328,
+      "3.0.1": 196609,
+      "1.0.0.0": 65536
+    },
+    "rawFromText": {
+      "65536": 65536,
+      "1.0.0": 65536,
+      "300": 19660800,
+      "0": 0
+    },
+    "compactDotted": {
+      "1.0.0": "1.0",
+      "1.0": "1.0",
+      "3.0.1": "3.0.1",
+      "1.2.3.0": "1.2.3",
+      "2.0.0": "2.0"
+    },
+    "parseVersionsTxt": {
+      "0100000000010800": {
+        "262144": ""
+      },
+      "0100000000010000": {
+        "262144": ""
+      },
+      "0100A3A0149EC800": {
+        "262144": ""
+      },
+      "0100A3A0149EC000": {
+        "262144": ""
+      }
+    },
+    "updateStatus": {
+      "0100000000010000|none": {
+        "text": "Latest Version on File: v100000000010000 (1525878906.103.16)\nLatest Version Released: v131072 (2.0.0) (2018-01-01)",
+        "available": []
+      },
+      "0100000000010000|Super Mario Odyssey [v131072].nsp": {
+        "text": "Latest Version on File: v100000000010000 (1525878906.103.16)\nLatest Version Released: v131072 (2.0.0) (2018-01-01)",
+        "available": []
+      },
+      "0100000000010000|Super Mario Odyssey [v262144].nsp": {
+        "text": "Latest Version on File: v100000000010000 (1525878906.103.16)\nLatest Version Released: v131072 (2.0.0) (2018-01-01)",
+        "available": []
+      },
+      "0100A3A0149EC000|none": {
+        "text": "Latest Version on File: v0 (0.0.0)\nLatest Version Released: v131072 (2.0.0) (2021-01-01)",
+        "available": [
+          {
+            "version": 131072,
+            "release_date": "2021-01-01"
+          }
+        ]
+      },
+      "0100A3A0149EC000|Super Mario Odyssey [v131072].nsp": {
+        "text": "Latest Version on File: v131072 (2.0.0)\nLatest Version Released: v131072 (2.0.0) (2021-01-01)",
+        "available": []
+      },
+      "0100A3A0149EC000|Super Mario Odyssey [v262144].nsp": {
+        "text": "Latest Version on File: v262144 (4.0.0)\nLatest Version Released: v131072 (2.0.0) (2021-01-01)",
+        "available": []
+      }
+    },
+    "mergedTitleIds": [
+      "0100000000010000",
+      "0100000000010800",
+      "0100A3A0149EC000",
+      "0100A3A0149EC800"
+    ]
+  },
+  "httpRange": [
+    {
+      "size": 1000,
+      "header": "bytes=0-99",
+      "expected": [
+        0,
+        99
+      ]
+    },
+    {
+      "size": 1000,
+      "header": "bytes=100-",
+      "expected": [
+        100,
+        999
+      ]
+    },
+    {
+      "size": 1000,
+      "header": "bytes=-100",
+      "expected": [
+        900,
+        999
+      ]
+    },
+    {
+      "size": 1000,
+      "header": "bytes=0-0",
+      "expected": [
+        0,
+        0
+      ]
+    },
+    {
+      "size": 1000,
+      "header": "bytes=999-1000",
+      "expected": [
+        999,
+        999
+      ]
+    },
+    {
+      "size": 1000,
+      "header": "bytes=1000-1200",
+      "expected": null
+    },
+    {
+      "size": 1000,
+      "header": "bytes=500-400",
+      "expected": null
+    },
+    {
+      "size": 1000,
+      "header": "bytes=-0",
+      "expected": null
+    },
+    {
+      "size": 1000,
+      "header": "bytes=0-",
+      "expected": [
+        0,
+        999
+      ]
+    },
+    {
+      "size": 1000,
+      "header": "bytes=",
+      "expected": null
+    },
+    {
+      "size": 1000,
+      "header": "items=0-10",
+      "expected": null
+    },
+    {
+      "size": 0,
+      "header": "bytes=0-10",
+      "expected": null
+    },
+    {
+      "size": 1,
+      "header": "bytes=0-0",
+      "expected": [
+        0,
+        0
+      ]
+    },
+    {
+      "size": 1,
+      "header": "bytes=1-2",
+      "expected": null
+    },
+    {
+      "size": 2048,
+      "header": "bytes=2047-2047",
+      "expected": [
+        2047,
+        2047
+      ]
+    }
+  ],
+  "metadata": {
+    "normalizedTitles": {
+      "The Legend of Zelda™: Breath of the Wild": "The Legend of Zelda: Breath of the Wild",
+      "Pokémon Scarlet – The Hidden Treasure of Area Zero": "Pokémon Scarlet - The Hidden Treasure of Area Zero",
+      "Super Mario Odyssey [0100000000010000]": "Super Mario Odyssey",
+      "The Last of Us™ Remastered": "The Last of Us Remastered",
+      "Xenoblade Chronicles™ 3: Future Redeemed": "Xenoblade Chronicles 3: Future Redeemed",
+      "A Game: The Sequel": "A Game: The Sequel",
+      "An Apple: The Beginning": "An Apple: The Beginning"
+    },
+    "searchQueries": {
+      "The Legend of Zelda™: Breath of the Wild": [
+        "The Legend of Zelda: Breath of the Wild",
+        "The Legend of Zelda Breath of the Wild",
+        "The Legend of Zelda",
+        "Legend of Zelda: Breath of Wild"
+      ],
+      "Pokémon Scarlet – The Hidden Treasure of Area Zero": [
+        "Pokémon Scarlet - The Hidden Treasure of Area Zero",
+        "Pokémon Scarlet - Hidden Treasure of Area Zero"
+      ],
+      "Super Mario Odyssey [0100000000010000]": [
+        "Super Mario Odyssey"
+      ],
+      "The Last of Us™ Remastered": [
+        "The Last of Us Remastered",
+        "Last of Us Remastered"
+      ],
+      "Xenoblade Chronicles™ 3: Future Redeemed": [
+        "Xenoblade Chronicles 3: Future Redeemed",
+        "Xenoblade Chronicles 3 Future Redeemed",
+        "Xenoblade Chronicles 3"
+      ],
+      "A Game: The Sequel": [
+        "A Game: The Sequel",
+        "A Game The Sequel",
+        "A Game",
+        "Game: Sequel"
+      ],
+      "An Apple: The Beginning": [
+        "An Apple: The Beginning",
+        "An Apple The Beginning",
+        "An Apple",
+        "Apple: Beginning"
+      ]
+    },
+    "titleSimilarity": {
+      "Super Mario Odyssey||Super Mario Odyssey": 1.0,
+      "Super Mario Odyssey||Super Mario Odyssey 2": 0.9,
+      "The Legend of Zelda: Breath of the Wild||The Legend of Zelda: Tears of the Kingdom": 0.825,
+      "Hades||Hades II": 0.9,
+      "Pokémon Scarlet||Pokemon Scarlet": 0.9333333333333333,
+      "Splatoon 3||SPLATOON 3": 1.0,
+      "Metroid Dread||Metroid": 0.9,
+      "Animal Crossing: New Horizons||Animal Crossing New Horizons": 0.9824561403508771
+    },
+    "sequenceMatcherRatio": {
+      "Super Mario Odyssey||Super Mario Odyssey": 1.0,
+      "Super Mario Odyssey||Super Mario Odyssey 2": 0.95,
+      "The Legend of Zelda: Breath of the Wild||The Legend of Zelda: Tears of the Kingdom": 0.825,
+      "Hades||Hades II": 0.7692307692307693,
+      "Pokémon Scarlet||Pokemon Scarlet": 0.9333333333333333,
+      "Splatoon 3||SPLATOON 3": 0.3,
+      "Metroid Dread||Metroid": 0.7,
+      "Animal Crossing: New Horizons||Animal Crossing New Horizons": 0.9824561403508771
+    },
+    "fuzzRatio": {
+      "super mario odyssey||super mario odyssey": 1.0,
+      "super mario odyssey||super mario odyssey 2": 0.95,
+      "super mario odyssey||super mario galaxy": 0.7027027027027026,
+      "zelda||zelda": 1.0,
+      "||": 1.0,
+      "a||": 0.0,
+      "hades||hades ii": 0.7692307692307692,
+      "the legend of zelda - tears of the kingdom||the legend of zelda - breath of the wild": 0.8292682926829268,
+      "mario kart 8 deluxe||mario kart 8 deluxe booster course pass": 0.6551724137931035,
+      "splatoon 3||splatooon 3": 0.9523809523809522,
+      "xenoblade chronicles 3||xenoblade chronicles 3": 1.0,
+      "pokemon scarlet||pokemon violet": 0.7586206896551724
+    },
+    "escapeQuery": {
+      "plain": "plain",
+      "with \"quotes\"": "with \\\"quotes\\\"",
+      "back\\slash": "back\\\\slash",
+      "both \"and\" \\ here": "both \\\"and\\\" \\\\ here"
+    }
+  },
+  "ui": {
+    "formatBytes": {
+      "0": "0.0 B",
+      "1": "1.0 B",
+      "512": "512.0 B",
+      "1023": "1023.0 B",
+      "1024": "1.0 KB",
+      "1536": "1.5 KB",
+      "1048576": "1.0 MB",
+      "5368709120": "5.0 GB",
+      "3298534883328": "3.0 TB"
+    },
+    "installSizeText": {
+      "none": "Install size: Base 0.0 B + 0 update/DLC file(s) 0.0 B = Total size 0.0 B",
+      "base-only": "Install size: Base 1.0 KB + 0 update/DLC file(s) 0.0 B = Total size 1.0 KB",
+      "base-plus-updates": "Install size: Base 5.0 GB + 3 update/DLC file(s) 2.0 GB = Total size 7.0 GB"
+    },
+    "pathIsInstallDestination": {
+      "C:\\Games\\A.nsp||C:\\Games": false,
+      "C:\\Games\\Sub\\A.nsp||C:\\Games": false,
+      "C:\\Other\\A.nsp||C:\\Games": false,
+      "||C:\\Games": false,
+      "shell:::abc\\A.nsp||shell:::abc": true
+    },
+    "higherResImageUrl": {
+      "//images.igdb.com/igdb/image/upload/t_thumb/abc.jpg": "//images.igdb.com/igdb/image/upload/t_cover_big_2x/abc.jpg",
+      "http://images.igdb.com/igdb/image/upload/t_thumb/abc.jpg": "http://images.igdb.com/igdb/image/upload/t_cover_big_2x/abc.jpg",
+      "https://images.igdb.com/igdb/image/upload/t_cover_big/abc.jpg": "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/abc.jpg",
+      "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/abc.jpg": "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/abc.jpg",
+      "https://images.igdb.com/igdb/image/upload/t_screenshot_med/abc.jpg": "https://images.igdb.com/igdb/image/upload/t_1080p/abc.jpg",
+      "https://images.igdb.com/igdb/image/upload/t_720p/abc.jpg": "https://images.igdb.com/igdb/image/upload/t_1080p/abc.jpg",
+      "https://example.com/cover.png": "https://example.com/cover.png"
+    },
+    "youtubePlayerUrl": {
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "https://www.youtube.com/embed/dQw4w9WgXcQ": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "https://youtu.be/dQw4w9WgXcQ": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "https://youtu.be/dQw4w9WgXcQ?t=30": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "https://example.com/video": "https://example.com/video"
+    },
+    "youtubeEmbedUrl": {
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      "https://www.youtube.com/embed/dQw4w9WgXcQ": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      "https://youtu.be/dQw4w9WgXcQ": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      "https://youtu.be/dQw4w9WgXcQ?t=30": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      "https://example.com/video": "https://example.com/video"
+    },
+    "displayFolder": {
+      "labelled-shell": "Switch/SD Card Install",
+      "plain": "C:\\Games"
+    },
+    "metadataReady": {
+      "with-secret": true,
+      "without-secret": false
+    }
+  },
+  "httpContentDisposition": {
+    "Game.nsp": "attachment; filename=\"Game.nsp\"; filename*=UTF-8''Game.nsp",
+    "Spiel Übersicht.nsp": "attachment; filename=\"Spiel ?bersicht.nsp\"; filename*=UTF-8''Spiel%20%C3%9Cbersicht.nsp",
+    "quote\"s.nsp": "attachment; filename=\"quotes.nsp\"; filename*=UTF-8''quote%22s.nsp"
+  }
+}

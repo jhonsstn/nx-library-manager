@@ -1,0 +1,21 @@
+Switch Game Catalog Electron Migration Specification
+
+README.md
+architecture/01-system-architecture.md
+architecture/02-project-structure.md
+architecture/03-ipc-contract.md
+architecture/04-error-logging-security.md
+backend/05-catalog-and-scanner.md
+backend/06-filename-matching-and-versions.md
+backend/07-metadata-service.md
+backend/08-file-and-install-service.md
+backend/09-dbi-http-server.md
+data/10-database-schema-and-migrations.md
+data/11-settings-and-user-data.md
+frontend/12-ui-and-state.md
+frontend/13-user-flows.md
+platform/14-windows-mtp.md
+platform/15-packaging-and-updates.md
+testing/16-testing-strategy.md
+delivery/17-migration-plan.md
+delivery/18-definition-of-done.md

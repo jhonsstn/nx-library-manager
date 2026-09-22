@@ -15,28 +15,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Installs the version pinned by the packageManager field in package.json.
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Type-check
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Unit and integration tests
-        run: npm test
+        run: pnpm test
 
       - name: Build renderer, main and preload
-        run: npm run build
+        run: pnpm run build
 
-      # better-sqlite3 must match the Electron ABI, which `npm run package:win`
-      # handles through electron-builder's npmRebuild step.
+      # better-sqlite3 ships N-API prebuilds for every platform (win32-x64
+      # included), so no per-ABI rebuild is needed. electron-builder still runs
+      # its npmRebuild step, which is a no-op for an N-API module.
       - name: Package Windows installer and portable build
-        run: npx electron-builder --win --x64 --publish never
+        run: pnpm exec electron-builder --win --x64 --publish never
 
       - name: Generate checksums
         shell: pwsh

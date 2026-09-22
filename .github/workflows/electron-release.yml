@@ -1,6 +1,6 @@
 name: Electron build
 
-# Packaging pipeline from migration-spec/platform/15-packaging-and-updates.md.
+# Packaging pipeline from docs/platform/15-packaging-and-updates.md.
 # E2E (Playwright + Electron) is intentionally not run here: it needs a real
 # display and an interactive Windows session, so it stays a local/manual gate.
 on:

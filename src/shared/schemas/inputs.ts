@@ -44,16 +44,15 @@ export const CreateInstallInputSchema = z
     message: 'An install request needs a base game or at least one update file.',
   });
 
-export const DeleteFileInputSchema = z.object({
-  kind: z.enum(['game', 'update']),
-  id: positiveInt,
-});
+export const DeleteFileInputSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('game'), gameId: positiveInt }),
+  z.object({ kind: z.literal('update'), updateId: positiveInt }),
+]);
 
-export const MoveFileInputSchema = z.object({
-  kind: z.enum(['game', 'update']),
-  id: positiveInt,
-  destinationFolder: z.string().min(1),
-});
+export const MoveFileInputSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('game'), gameId: positiveInt, destinationFolder: z.string().min(1) }),
+  z.object({ kind: z.literal('update'), updateId: positiveInt, destinationFolder: z.string().min(1) }),
+]);
 
 export const AssignUpdatesInputSchema = z.object({
   gameId: positiveInt,

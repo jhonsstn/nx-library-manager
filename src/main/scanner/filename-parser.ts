@@ -1,26 +1,7 @@
 import { SUPPORTED_FILE_EXTENSIONS } from '../../shared/constants';
 import { rawVersionFromVersionText } from '../../shared/format/versions';
 
-/**
- * Port of `switch_catalog/filename.py`.
- *
- * Everything here is a pure string transform: the Python original uses
- * `pathlib.Path(name).stem` only to drop the extension, so the functions accept
- * a bare file name (or path) and never touch the filesystem.
- *
- * Two deliberate deviations, both verified against the Python original:
- *
- * - `\` is treated as a path separator (Windows `pathlib` behaviour) instead of
- *   being part of the stem, so paths behave the same on every platform;
- * - case mapping uses the JavaScript engine's Unicode tables (Unicode 17) rather
- *   than the ones CPython ships with (Unicode 16). A differential run over every
- *   codepoint agrees with `str.title()`/`str.islower()` except for characters the
- *   two versions disagree about (Beria Erfe, newly assigned Latin Extended
- *   letters), digraphs whose titlecase mapping differs from their uppercase
- *   mapping (`ǳ` → `ǲ` in Python, `Ǳ` here), multi-character titlecase
- *   expansions (`ß` → `Ss` in Python, `SS` here) and scripts CPython has no
- *   titlecase mapping for (Georgian Mtavruli). None occur in catalog file names.
- */
+/** Pure filename transforms; these functions never touch the filesystem. */
 
 /** Extensions the catalog recognises, re-exported from the shared constants. */
 export const SUPPORTED_EXTENSIONS: readonly string[] = SUPPORTED_FILE_EXTENSIONS;
@@ -49,7 +30,7 @@ const SCENE_WORDS: Record<string, true> = {
 
 /**
  * `\b(?:update\s*)?v?(\d+(?:\.\d+){1,3}|\d{4,})\b` — `detect_version`'s last resort and
- * `clean_title`'s version stripper. Python's `re.sub` replaces every match, hence the `_G` twin.
+ * the title-cleaning version stripper. The `_G` twin replaces every match.
  */
 const VERSION_RE = /\b(?:update\s*)?v?(\d+(?:\.\d+){1,3}|\d{4,})\b/i;
 const VERSION_RE_G = new RegExp(VERSION_RE.source, 'gi');
@@ -78,14 +59,7 @@ const BARE_NUMBER_RE_G = /\b\d{4,}\b/g;
 /** Bracket groups or word runs, matched in document order for `markers`. */
 const MARKER_TOKEN_RE = /[\[(][^\])]*[\])]|[\p{L}\p{N}]+/gu;
 
-/**
- * Python's cased/upper/lower classification.
- *
- * Note these are *not* `str.islower()`/`str.isupper()`: CPython's `islower()` is
- * false when any character is uppercase or titlecase (`Lt`), and true only when
- * at least one lowercase character is present, while `str.title()`'s state
- * machine keys off "cased" (lowercase, uppercase or titlecase).
- */
+/** Unicode cased/upper/lower classification used by title normalization. */
 const UPPERCASE_RE = /[\p{Uppercase}\p{Lt}]/u;
 const LOWERCASE_RE = /\p{Lowercase}/u;
 const CASED_RE = /\p{Cased}/u;
@@ -106,9 +80,9 @@ export interface ParsedSwitchFilename {
 }
 
 /**
- * `pathlib.Path(name).stem`: the last path segment without its suffix. A leading
+ * The last path segment without its suffix. A leading
  * dot does not start a suffix (`.nsp` keeps its name) and a trailing dot is kept
- * (`a.` → `a.`), exactly like CPython's `PurePath.stem`.
+ * (`a.` → `a.`).
  */
 function pathStem(fileName: string): string {
   const slash = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'));
@@ -117,7 +91,7 @@ function pathStem(fileName: string): string {
   return 0 < dot && dot < base.length - 1 ? base.slice(0, dot) : base;
 }
 
-/** `pathlib.Path(name).suffix`, lowercased (`''` when there is none). */
+/** File suffix, lowercased (`''` when there is none). */
 function pathSuffix(fileName: string): string {
   const slash = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'));
   const base = slash >= 0 ? fileName.slice(slash + 1) : fileName;
@@ -125,18 +99,16 @@ function pathSuffix(fileName: string): string {
   return 0 < dot && dot < base.length - 1 ? base.slice(dot) : '';
 }
 
-/** Collapses every whitespace run, mirroring Python's `" ".join(text.split())`. */
+/** Collapses every whitespace run. */
 function collapseWhitespace(value: string): string {
   const trimmed = value.trim();
   return trimmed ? trimmed.split(/\s+/).join(' ') : '';
 }
 
 /**
- * Python's `str.title()`: uppercase the first cased character of each word and
- * lowercase the rest. Only the case-mapping data differs (see the module doc:
- * `ß` becomes `Ss` in CPython and `SS` here); the state machine is the same.
+ * Uppercase the first cased character of each word and lowercase the rest.
  */
-function pythonTitle(value: string): string {
+function titleCaseWords(value: string): string {
   let previousIsCased = false;
   let result = '';
   for (const char of value) {
@@ -151,8 +123,8 @@ function pythonTitle(value: string): string {
   return result;
 }
 
-/** Python's `str.islower()`: at least one lowercase character and no uppercase/titlecase one. */
-function pythonIsLower(value: string): boolean {
+/** At least one lowercase character and no uppercase/titlecase character. */
+function isAllLowercase(value: string): boolean {
   if (UPPERCASE_RE.test(value)) return false;
   return LOWERCASE_RE.test(value);
 }
@@ -242,7 +214,7 @@ export function cleanTitle(fileName: string, options: CleanTitleOptions = {}): s
   }
 
   const cleaned = collapseWhitespace(words.join(' '));
-  return pythonIsLower(cleaned) ? pythonTitle(cleaned) : cleaned;
+  return isAllLowercase(cleaned) ? titleCaseWords(cleaned) : cleaned;
 }
 
 /** Case-insensitive extension test against `SUPPORTED_EXTENSIONS`. */

@@ -10,7 +10,6 @@ import type {
   HttpServerStatusDto,
   InstallJobDto,
   JobStartedDto,
-  LegacyDataInfoDto,
   MetadataBulkProgressDto,
   MetadataCandidateDto,
   MtpStatusDto,
@@ -18,6 +17,7 @@ import type {
   ScanCompletedDto,
   ScanProgressDto,
   ScanStatusDto,
+  ShutdownStatusDto,
 } from '../types/domain';
 import type { PublicSettingsDto, SettingsUpdateInput } from '../types/settings';
 import type { DeleteFileResultDto } from './results';
@@ -135,9 +135,8 @@ export function createSwitchCatalogApi(bridge: IpcBridge): SwitchCatalogApi {
       getPlatform: () => call<string>(IPC.app.getPlatform),
       checkForUpdates: () => call<AppUpdateStatusDto>(IPC.app.checkForUpdates),
       openExternal: (url) => call<void>(IPC.app.openExternal, [url]),
-      getLegacyDataInfo: () => call<LegacyDataInfoDto>(IPC.app.getLegacyDataInfo),
-      importLegacyData: () => call<PublicSettingsDto>(IPC.app.importLegacyData),
-      skipLegacyImport: () => call<PublicSettingsDto>(IPC.app.skipLegacyImport),
+      onVersionsChanged: async (listener) => on<void>(EVENTS.versionsChanged, listener),
+      onShutdownStatus: async (listener) => on<ShutdownStatusDto>(EVENTS.shutdownStatusChanged, listener),
     },
   };
 }

@@ -3,9 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IPC } from '@shared/contracts/ipc';
-import type { HttpServerStatusDto, LegacyDataInfoDto, MtpStatusDto } from '@shared/types/domain';
+import type { HttpServerStatusDto, MtpStatusDto } from '@shared/types/domain';
 import type { PublicSettingsDto } from '@shared/types/settings';
-import { FirstRunImportDialog } from '@renderer/features/migration/FirstRunImportDialog';
 import { SettingsPage } from '@renderer/pages/SettingsPage';
 import { renderWithProviders } from '../../helpers/render';
 
@@ -27,7 +26,6 @@ const SETTINGS: PublicSettingsDto = {
   defaultInstallFolder: '/install',
   installFolderLabel: '',
   gridCoverSize: 170,
-  legacyImportDismissed: true,
   igdbClientSecretConfigured: true,
   httpServerPasswordConfigured: true,
 };
@@ -51,27 +49,6 @@ const SERVER_STOPPED: HttpServerStatusDto = {
 
 const SERVER_RUNNING: HttpServerStatusDto = { ...SERVER_STOPPED, running: true, authEnabled: true };
 
-const NO_LEGACY: LegacyDataInfoDto = {
-  found: false,
-  sourceDirectory: '/home/user/.switch_library_catalog',
-  databasePresent: false,
-  settingsPresent: false,
-  games: 0,
-  updates: 0,
-  favorites: 0,
-  error: null,
-};
-
-const LEGACY_FOUND: LegacyDataInfoDto = {
-  ...NO_LEGACY,
-  found: true,
-  databasePresent: true,
-  settingsPresent: true,
-  games: 328,
-  updates: 811,
-  favorites: 56,
-};
-
 function pageHandlers(overrides: Record<string, (args: unknown[]) => unknown> = {}) {
   return {
     [IPC.settings.get]: () => SETTINGS,
@@ -80,7 +57,6 @@ function pageHandlers(overrides: Record<string, (args: unknown[]) => unknown> = 
     [IPC.httpServer.getStatus]: () => SERVER_STOPPED,
     [IPC.install.list]: () => [],
     [IPC.app.getVersion]: () => '1.0.0-beta.1',
-    [IPC.app.getLegacyDataInfo]: () => NO_LEGACY,
     ...overrides,
   };
 }
@@ -264,51 +240,5 @@ describe('SettingsPage', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Reset library' }));
     await waitFor(() => expect(resets).toBe(1));
-  });
-});
-
-describe('FirstRunImportDialog', () => {
-  it('stays hidden when no legacy data was found', async () => {
-    renderWithProviders(<FirstRunImportDialog />, { handlers: pageHandlers() });
-
-    await waitFor(() => expect(screen.queryByText('Existing Switch Game Catalog data found')).toBeNull());
-  });
-
-  it('stays hidden when the prompt was already answered', async () => {
-    const handlers = pageHandlers({
-      [IPC.settings.get]: () => ({ ...SETTINGS, legacyImportDismissed: true }),
-      [IPC.app.getLegacyDataInfo]: () => LEGACY_FOUND,
-    });
-    renderWithProviders(<FirstRunImportDialog />, { handlers });
-
-    await waitFor(() => expect(screen.queryByText('Existing Switch Game Catalog data found')).toBeNull());
-  });
-
-  it('shows the legacy counts and imports the existing data', async () => {
-    let imports = 0;
-    const handlers = pageHandlers({
-      [IPC.settings.get]: () => ({ ...SETTINGS, legacyImportDismissed: false }),
-      [IPC.app.getLegacyDataInfo]: () => LEGACY_FOUND,
-      [IPC.app.importLegacyData]: () => {
-        imports += 1;
-        return { ...SETTINGS, legacyImportDismissed: true, baseGamesFolder: '/games' };
-      },
-    });
-    renderWithProviders(<FirstRunImportDialog />, { handlers });
-
-    const heading = await screen.findByRole('heading', { name: 'Existing Switch Game Catalog data found' });
-    expect(heading).toBeTruthy();
-    expect(screen.getByText('328')).toBeTruthy();
-    expect(screen.getByText('811')).toBeTruthy();
-    expect(screen.getByText('56')).toBeTruthy();
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Import Existing Data' }));
-
-    await waitFor(() => expect(imports).toBe(1));
-    expect(await screen.findByText(/Existing data imported/)).toBeTruthy();
-    await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: 'Existing Switch Game Catalog data found' })).toBeNull(),
-    );
   });
 });

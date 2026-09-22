@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import fixture from '../../fixtures/legacy/behavior.json';
 import { DEFAULT_FUZZY_MATCH_THRESHOLD } from '@shared/constants';
 import { cleanTitle } from '@main/scanner/filename-parser';
 import {
@@ -10,40 +9,12 @@ import {
   type MatchCandidateGame,
 } from '@main/scanner/match-update';
 
-/** Rows shaped like the ones behind the captured legacy match results. */
 function buildGames(gameFileNames: string[]): MatchCandidateGame[] {
   return gameFileNames.map((fileName, index) => {
     const title = cleanTitle(fileName);
     return { id: index + 1, displayTitle: title, cleanedTitle: title, fileName };
   });
 }
-
-describe('legacy matching fixtures', () => {
-  it.each(fixture.matching)('$updateFileName', (entry) => {
-    const games = buildGames(entry.gameFileNames);
-    const gamesById = new Map(games.map((game) => [game.id, game]));
-    const updateTitle = cleanTitle(entry.updateFileName, { forUpdate: true }).toLowerCase();
-    expect(updateTitle).toBe(entry.updateTitle);
-
-    for (const expected of entry.scores) {
-      const game = gamesById.get(expected.gameId);
-      if (!game) throw new Error(`fixture references game ${expected.gameId}, which was not built`);
-      const score = Math.max(
-        titleMatchScore(updateTitle, game.cleanedTitle.toLowerCase()),
-        titleMatchScore(updateTitle, game.displayTitle.toLowerCase()),
-      );
-      expect(score).toBeCloseTo(expected.score, 10);
-    }
-
-    const idMatch = matchUpdateByTitleId(entry.updateFileName, games);
-    expect(idMatch.gameId).toBe(entry.titleIdMatch.gameId);
-    expect(idMatch.confidence).toBeCloseTo(entry.titleIdMatch.confidence, 10);
-
-    const best = matchUpdate(entry.updateFileName, games);
-    expect(best.gameId).toBe(entry.bestMatch.gameId);
-    expect(best.confidence).toBeCloseTo(entry.bestMatch.confidence, 10);
-  });
-});
 
 describe('titleMatchScore', () => {
   it('applies the legacy prefix scores', () => {

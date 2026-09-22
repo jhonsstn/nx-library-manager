@@ -11,7 +11,6 @@ export const queryKeys = {
   httpServerStatus: () => ['http-server-status'] as const,
   installJobs: () => ['install-jobs'] as const,
   appVersion: () => ['app-version'] as const,
-  legacyDataInfo: () => ['legacy-data-info'] as const,
 };
 
 export const catalogKeysToInvalidate = () => [

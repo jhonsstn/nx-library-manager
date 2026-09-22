@@ -5,15 +5,11 @@ import { OpenExternalInputSchema } from '../../shared/schemas/inputs';
 import { openExternalUrl } from '../lifecycle/window';
 import { handle } from './handle';
 import type { IpcDeps } from './deps';
+import { updateSettingsTransactional } from '../settings/update-settings';
 
 export function registerSettingsIpc(deps: IpcDeps): void {
   handle(IPC.settings.get, z.tuple([]), () => deps.settings.load());
-  handle(IPC.settings.update, z.tuple([SettingsUpdateSchema]), async (input) => {
-    const publicSettings = deps.settings.update(input);
-    // HTTP server settings take effect immediately (Qt `_sync_http_server`).
-    await deps.httpServer.applySettings();
-    return publicSettings;
-  });
+  handle(IPC.settings.update, z.tuple([SettingsUpdateSchema]), (input) => updateSettingsTransactional(deps, input));
 }
 
 export function registerHttpServerIpc(deps: IpcDeps): void {
@@ -27,7 +23,4 @@ export function registerAppIpc(deps: IpcDeps): void {
   handle(IPC.app.getPlatform, z.tuple([]), () => process.platform);
   handle(IPC.app.checkForUpdates, z.tuple([]), () => deps.appUpdate.checkLatestRelease());
   handle(IPC.app.openExternal, z.tuple([OpenExternalInputSchema]), (input) => openExternalUrl(input.url));
-  handle(IPC.app.getLegacyDataInfo, z.tuple([]), () => deps.legacy.info());
-  handle(IPC.app.importLegacyData, z.tuple([]), () => deps.legacy.import());
-  handle(IPC.app.skipLegacyImport, z.tuple([]), () => deps.legacy.skip());
 }

@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { rename as renameAsync } from 'node:fs/promises';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -137,6 +138,128 @@ describe('moveFileToFolder', () => {
     const nested = join(harness.dir, 'created', 'nested');
     expect(await moveFileToFolder(moved, nested)).toBe(join(nested, 'Game (1).nsp'));
   });
+
+  it('streams a simulated cross-volume move and reports byte progress', async () => {
+    const harness = createHarness();
+    const payload = Buffer.alloc(512 * 1024, 7);
+    const source = join(harness.libraryDir, 'Large.nsp');
+    writeFileSync(source, payload);
+    const progress: number[] = [];
+    const crossDeviceRename = async () => {
+      const error = new Error('cross-device') as NodeJS.ErrnoException;
+      error.code = 'EXDEV';
+      throw error;
+    };
+
+    const moved = await moveFileToFolder(source, harness.destinationDir, {
+      renameFile: crossDeviceRename,
+      onProgress: (bytes) => progress.push(bytes),
+    });
+
+    expect(readFileSync(moved)).toEqual(payload);
+    expect(existsSync(source)).toBe(false);
+    expect(progress.at(-1)).toBe(payload.length);
+    expect(progress.length).toBeGreaterThan(1);
+    expect(progress.every((value, index) => index === 0 || value > progress[index - 1])).toBe(true);
+  });
+
+  it('cancels a streamed move without deleting the source or leaving a partial file', async () => {
+    const harness = createHarness();
+    const source = join(harness.libraryDir, 'Cancel.nsp');
+    writeFileSync(source, Buffer.alloc(2 * 1024 * 1024, 3));
+    const controller = new AbortController();
+    const crossDeviceRename = async () => {
+      const error = new Error('cross-device') as NodeJS.ErrnoException;
+      error.code = 'EXDEV';
+      throw error;
+    };
+
+    await expect(
+      moveFileToFolder(source, harness.destinationDir, {
+        renameFile: crossDeviceRename,
+        signal: controller.signal,
+        onProgress: () => controller.abort(),
+      }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(existsSync(source)).toBe(true);
+    expect(readdirSync(harness.destinationDir)).toEqual([]);
+  });
+
+  it('rolls a same-volume rename back when cancellation wins the completion race', async () => {
+    const harness = createHarness();
+    const source = writeFile(join(harness.libraryDir, 'Rename.nsp'), 'payload');
+    const controller = new AbortController();
+
+    await expect(
+      moveFileToFolder(source, harness.destinationDir, {
+        signal: controller.signal,
+        renameFile: async (from, to) => {
+          await renameAsync(from, to);
+          controller.abort();
+        },
+      }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(existsSync(source)).toBe(true);
+    expect(readdirSync(harness.destinationDir)).toEqual([]);
+  });
+
+  it('removes the finalized destination when source deletion fails', async () => {
+    const harness = createHarness();
+    const source = writeFile(join(harness.libraryDir, 'Compensate.nsp'), 'payload');
+    const crossDeviceRename = async () => {
+      const error = new Error('cross-device') as NodeJS.ErrnoException;
+      error.code = 'EXDEV';
+      throw error;
+    };
+
+    await expect(
+      moveFileToFolder(source, harness.destinationDir, {
+        renameFile: crossDeviceRename,
+        unlinkSource: async () => {
+          throw new Error('source locked');
+        },
+      }),
+    ).rejects.toThrow('source locked');
+
+    expect(existsSync(source)).toBe(true);
+    expect(readdirSync(harness.destinationDir)).toEqual([]);
+  });
+
+  it('reports both paths when source deletion and compensation fail', async () => {
+    const harness = createHarness();
+    const source = writeFile(join(harness.libraryDir, 'Stranded.nsp'), 'payload');
+    const destination = join(harness.destinationDir, 'Stranded.nsp');
+    const crossDeviceRename = async () => {
+      const error = new Error('cross-device') as NodeJS.ErrnoException;
+      error.code = 'EXDEV';
+      throw error;
+    };
+
+    let failure: unknown;
+    try {
+      await moveFileToFolder(source, harness.destinationDir, {
+        renameFile: crossDeviceRename,
+        unlinkSource: async () => {
+          throw new Error('source locked');
+        },
+        removeDestination: async () => {
+          throw new Error('destination locked');
+        },
+      });
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(SwitchCatalogError);
+    expect((failure as SwitchCatalogError).details).toMatchObject({
+      sourcePath: source,
+      destinationPath: destination,
+    });
+    expect(existsSync(source)).toBe(true);
+    expect(existsSync(destination)).toBe(true);
+  });
 });
 
 describe('deleteFileIfPresent', () => {
@@ -150,11 +273,22 @@ describe('deleteFileIfPresent', () => {
 });
 
 describe('FileService.deleteTrackedFile', () => {
+  it('deletes by game id when the base-file id differs', async () => {
+    const harness = createHarness();
+    upsertGameByCleanedTitle(harness.db, { displayTitle: 'Other', cleanedTitle: 'other' });
+    const game = seedGame(harness.db, harness.libraryDir);
+    expect(game.gameId).not.toBe(game.fileId);
+
+    await harness.service.deleteTrackedFile({ kind: 'game', gameId: game.gameId });
+
+    expect(getGame(harness.db, game.gameId)).toBeNull();
+    expect(existsSync(game.filePath)).toBe(false);
+  });
   it('deletes an update file from disk and drops its row', async () => {
     const harness = createHarness();
     const { updateId, filePath } = seedUpdate(harness.db, harness.libraryDir);
 
-    const result = await harness.service.deleteTrackedFile({ kind: 'update', id: updateId });
+    const result = await harness.service.deleteTrackedFile({ kind: 'update', updateId });
 
     expect(result).toEqual({ id: updateId, kind: 'update', deletedFromDisk: true, cascaded: false });
     expect(existsSync(filePath)).toBe(false);
@@ -167,7 +301,7 @@ describe('FileService.deleteTrackedFile', () => {
     const update = seedUpdate(harness.db, harness.libraryDir, game.gameId);
     replaceScreenshots(harness.db, game.gameId, ['https://images.example/1.jpg', 'https://images.example/2.jpg']);
 
-    const result = await harness.service.deleteTrackedFile({ kind: 'game', id: game.gameId });
+    const result = await harness.service.deleteTrackedFile({ kind: 'game', gameId: game.gameId });
 
     expect(result).toEqual({ id: game.gameId, kind: 'game', deletedFromDisk: true, cascaded: true });
     expect(existsSync(game.filePath)).toBe(false);
@@ -183,7 +317,7 @@ describe('FileService.deleteTrackedFile', () => {
     const { updateId, filePath } = seedUpdate(harness.db, harness.libraryDir);
     unlinkSync(filePath);
 
-    const result = await harness.service.deleteTrackedFile({ kind: 'update', id: updateId });
+    const result = await harness.service.deleteTrackedFile({ kind: 'update', updateId });
 
     expect(result.deletedFromDisk).toBe(false);
     expect(getUpdate(harness.db, updateId)).toBeNull();
@@ -191,8 +325,8 @@ describe('FileService.deleteTrackedFile', () => {
 
   it('rejects unknown rows', async () => {
     const harness = createHarness();
-    await expectAppError(harness.service.deleteTrackedFile({ kind: 'game', id: 4242 }), 'NOT_FOUND');
-    await expectAppError(harness.service.deleteTrackedFile({ kind: 'update', id: 4242 }), 'NOT_FOUND');
+    await expectAppError(harness.service.deleteTrackedFile({ kind: 'game', gameId: 4242 }), 'NOT_FOUND');
+    await expectAppError(harness.service.deleteTrackedFile({ kind: 'update', updateId: 4242 }), 'NOT_FOUND');
   });
 });
 
@@ -204,7 +338,7 @@ describe('FileService.moveTrackedFile', () => {
 
     const result = await harness.service.moveTrackedFile({
       kind: 'update',
-      id: updateId,
+      updateId,
       destinationFolder: harness.destinationDir,
     });
 
@@ -224,7 +358,7 @@ describe('FileService.moveTrackedFile', () => {
 
     const result = await harness.service.moveTrackedFile({
       kind: 'game',
-      id: game.gameId,
+      gameId: game.gameId,
       destinationFolder: harness.destinationDir,
     });
 
@@ -241,7 +375,7 @@ describe('FileService.moveTrackedFile', () => {
     const { updateId, filePath } = seedUpdate(harness.db, harness.libraryDir);
 
     const error = await harness.service
-      .moveTrackedFile({ kind: 'update', id: updateId, destinationFolder: harness.destinationDir })
+      .moveTrackedFile({ kind: 'update', updateId, destinationFolder: harness.destinationDir })
       .catch((value: unknown) => value);
 
     expect((error as Error).message).toMatch(/disk I\/O error/);
@@ -256,13 +390,13 @@ describe('FileService.moveTrackedFile', () => {
     const { updateId } = seedUpdate(harness.db, harness.libraryDir);
 
     await expectAppError(
-      harness.service.moveTrackedFile({ kind: 'update', id: updateId, destinationFolder: 'relative/folder' }),
+      harness.service.moveTrackedFile({ kind: 'update', updateId, destinationFolder: 'relative/folder' }),
       'PATH_NOT_ALLOWED',
     );
     await expectAppError(
       harness.service.moveTrackedFile({
         kind: 'update',
-        id: updateId,
+        updateId,
         destinationFolder: 'shell:::{20D0-1}\\SD install',
       }),
       'PATH_NOT_ALLOWED',

@@ -61,9 +61,7 @@ interface QueueItem {
 }
 
 /**
- * Install queue (spec 08). Ports the Qt flows `install_selected_game` /
- * `install_selected_updates_only` / `process_install_items` /
- * `process_mtp_install_batch` onto persistent `install_jobs` rows.
+ * Persistent install queue for local-folder and MTP destinations.
  *
  * At most one transfer is active at a time, so ordering and progress stay
  * truthful: folder moves report real byte counts, while MTP transfers report
@@ -80,7 +78,9 @@ export class InstallService {
   private readonly freeSpace: ((folder: string) => Promise<number | null>) | undefined;
 
   private activePump: Promise<void> | null = null;
-  /** Set by `cancel` on a running folder transfer: the queue stops after it settles. */
+  private activeLocalTransfer: { jobId: number; controller: AbortController } | null = null;
+  private cancelRequestedJobId: number | null = null;
+  /** Stops the queue after the active operation settles or is cancelled. */
   private stopQueue = false;
   /** Set by `shutdown`: no new jobs, and the pump stops after the running transfer. */
   private shuttingDown = false;
@@ -252,7 +252,7 @@ export class InstallService {
   }
 
   /**
-   * Cancels a queued job, or stops the queue behind a running folder transfer.
+   * Cancels a queued job, or aborts a running folder transfer safely.
    * A running MTP transfer is never marked cancelled: the PowerShell copy cannot
    * be safely interrupted (spec 14).
    */
@@ -275,7 +275,9 @@ export class InstallService {
         return;
       }
       this.stopQueue = true;
-      this.logger?.info('install.queueStopRequested', { installJobId: jobId });
+      this.cancelRequestedJobId = jobId;
+      if (this.activeLocalTransfer?.jobId === jobId) this.activeLocalTransfer.controller.abort();
+      this.logger?.info('install.localCancelRequested', { installJobId: jobId });
       return;
     }
     this.logger?.debug('install.cancelIgnored', { installJobId: jobId, status: job.status });
@@ -286,6 +288,10 @@ export class InstallService {
     while (this.activePump) {
       await this.activePump;
     }
+  }
+
+  get isBusy(): boolean {
+    return this.activePump !== null;
   }
 
   /**
@@ -344,7 +350,7 @@ export class InstallService {
     const sorted = pending.slice().sort((a, b) => {
       const byVersion = a.item.rawVersion - b.item.rawVersion;
       if (byVersion !== 0) return byVersion;
-      // Python's `ORDER BY file_name` is byte-wise; avoid locale-dependent collation.
+      // Keep ordering byte-wise and independent of the host locale.
       if (a.item.fileName === b.item.fileName) return 0;
       return a.item.fileName < b.item.fileName ? -1 : 1;
     });
@@ -455,7 +461,9 @@ export class InstallService {
         try {
           await this.executeJob(job);
         } catch (error) {
-          this.failJob(job, toAppErrorDto(error));
+          const dto = toAppErrorDto(error);
+          if (dto.code === 'JOB_CANCELLED') this.cancelJob(job, dto);
+          else this.failJob(job, dto);
           break; // spec 08: a failed transfer stops the rest of the queue
         }
         if (this.stopQueue || this.shuttingDown) break;
@@ -485,9 +493,26 @@ export class InstallService {
 
   /** Folder install: real move, then the catalog rows follow the file. */
   private async moveToFolder(job: InstallJobDto): Promise<void> {
-    const destinationPath = await moveFileToFolder(job.sourcePath, job.destinationFolder);
-    this.applyFolderDestination(job, destinationPath);
-    this.finishJob(job, destinationPath, job.sizeBytes);
+    const controller = new AbortController();
+    this.activeLocalTransfer = { jobId: job.id, controller };
+    if (this.cancelRequestedJobId === job.id) controller.abort();
+    let lastProgressAt = 0;
+    try {
+      const destinationPath = await moveFileToFolder(job.sourcePath, job.destinationFolder, {
+        signal: controller.signal,
+        onProgress: (transferredBytes) => {
+          const now = this.now();
+          if (transferredBytes < job.sizeBytes && now - lastProgressAt < 200) return;
+          lastProgressAt = now;
+          this.updateStatus(job.id, { status: 'running', transferredBytes });
+        },
+      });
+      this.applyFolderDestination(job, destinationPath);
+      this.finishJob(job, destinationPath, job.sizeBytes);
+    } finally {
+      if (this.activeLocalTransfer?.jobId === job.id) this.activeLocalTransfer = null;
+      if (this.cancelRequestedJobId === job.id) this.cancelRequestedJobId = null;
+    }
   }
 
   private async copyToMtp(job: InstallJobDto): Promise<void> {
@@ -591,6 +616,11 @@ export class InstallService {
       code: error.code,
       message: error.message,
     });
+  }
+
+  private cancelJob(job: InstallJobDto, error: AppErrorDto): void {
+    this.updateStatus(job.id, { status: 'cancelled', error });
+    this.logger?.info('install.itemCancelled', { installJobId: job.id, fileName: job.displayName });
   }
 
   private updateStatus(jobId: number, update: InstallJobUpdate): InstallJobDto {

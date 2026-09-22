@@ -1,18 +1,14 @@
-import { existsSync, rmSync } from 'node:fs';
 import { app, BrowserWindow } from 'electron';
 import { join, resolve } from 'node:path';
-import type { PublicSettingsDto } from '../shared/types/settings';
-import type { LegacyDataInfoDto } from '../shared/types/domain';
-import { appError } from '../shared/errors/app-error';
 import { closeDatabase, openDatabase, type AppDatabase } from './db/database';
 import { runMigrations } from './db/migrations';
 import { createLogger, type Logger } from './lifecycle/logger';
 import { registerAppProtocol, registerAppSchemes, registerCatalogImageProtocol } from './lifecycle/protocols';
 import { createMainWindow, createRecoveryWindow } from './lifecycle/window';
 import { createSafeStorageCipher } from './lifecycle/safe-cipher';
-import { ensureAppPaths, legacyAppDir, resolveAppPaths, type AppPaths } from './platform/paths';
+import { ShutdownCoordinator } from './lifecycle/shutdown';
+import { ensureAppPaths, resolveAppPaths, type AppPaths } from './platform/paths';
 import { SettingsStore } from './settings/settings.store';
-import { importLegacyData, readLegacyDataInfo } from './settings/legacy-import';
 import { PowerShellMtpAdapter } from './mtp/powershell-mtp.adapter';
 import { CatalogService } from './services/catalog.service';
 import { FileService } from './services/file.service';
@@ -25,6 +21,7 @@ import { VersionService } from './services/version.service';
 import { AppUpdateService } from './services/app-update.service';
 import { ImageCache } from './metadata/image-cache';
 import { registerIpc, type IpcDeps } from './ipc';
+import { rejectNewIpcWork } from './ipc/handle';
 import { resolveScanInput } from './ipc/scan.ipc';
 import { EVENTS } from '../shared/contracts/ipc';
 import { MTP_STATUS_REFRESH_MS } from '../shared/constants';
@@ -39,13 +36,21 @@ interface AppState {
   mtp: MtpService;
   httpServer: HttpServerService;
   versions: VersionService;
-  /** True when this session created the catalog file, so it holds no user data. */
-  createdFreshDatabase: boolean;
   shuttingDown: boolean;
 }
 
 let state: AppState | null = null;
 let mainWindow: BrowserWindow | null = null;
+const shutdownCoordinator = new ShutdownCoordinator({
+  shutdown,
+  quit: () => app.quit(),
+  waitingMessage: () => {
+    if (state?.install.isBusy) return 'Waiting for the current install transfer to finish…';
+    if (state?.scanner.isBusy) return 'Cancelling the active library scan…';
+    return 'Finishing background work…';
+  },
+  onStatus: (status) => emit(EVENTS.shutdownStatusChanged, status),
+});
 
 registerAppSchemes();
 
@@ -62,8 +67,8 @@ if (!app.requestSingleInstanceLock()) {
     app.quit();
   });
 
-  app.on('before-quit', () => {
-    void shutdown();
+  app.on('before-quit', (event) => {
+    shutdownCoordinator.request(event);
   });
 
   void app.whenReady().then(() => {
@@ -85,7 +90,6 @@ function bootstrap(): void {
   }
   const settings = new SettingsStore({ paths, cipher });
 
-  const createdFreshDatabase = !existsSync(paths.databaseFile);
   const db = openDatabase(paths.databaseFile);
   try {
     const result = runMigrations(db, paths.databaseFile);
@@ -104,6 +108,7 @@ function bootstrap(): void {
   registerCatalogImageProtocol({ coversCacheDir: paths.coversCacheDir, screenshotsCacheDir: paths.screenshotsCacheDir });
 
   const versions = new VersionService({ db, paths, logger: logger.child('versions') });
+  versions.loadCached();
   const catalog = new CatalogService({
     db,
     versions,
@@ -164,7 +169,6 @@ function bootstrap(): void {
     mtp,
     httpServer,
     versions,
-    createdFreshDatabase,
     shuttingDown: false,
   };
 
@@ -182,17 +186,15 @@ function bootstrap(): void {
     httpServer,
     appUpdate,
     currentVersion: app.getVersion(),
-    legacy: {
-      info: () => readLegacyDataInfo(legacyAppDir()),
-      import: () => runLegacyImport(),
-      skip: () => settings.update({ legacyImportDismissed: true }),
-    },
     emit,
   };
   registerIpc(deps);
 
   const preloadPath = join(__dirname, '..', 'preload', 'index.js');
   mainWindow = createMainWindow({ preloadPath, iconPath: resolveIconPath() });
+  mainWindow.on('close', (event) => {
+    shutdownCoordinator.request(event);
+  });
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -201,8 +203,13 @@ function bootstrap(): void {
   install.recoverInterrupted();
   mtp.start();
   const currentSettings = settings.getFull();
-  void httpServer.applySettings();
-  void versions.load();
+  void httpServer.applySettings().catch((error: unknown) => {
+    logger.warn('http.startupFailed', { error: error instanceof Error ? error.message : String(error) });
+  });
+  void versions.load().then(
+    () => emit(EVENTS.versionsChanged, undefined),
+    (error: unknown) => logger.warn('versions.loadFailed', { error: error instanceof Error ? error.message : String(error) }),
+  );
   if (currentSettings.autoRescanOnStartup && currentSettings.baseGamesFolder) {
     void scanner.start(resolveScanInput(currentSettings, {})).catch((error: unknown) => {
       logger.warn('scan.autoStartFailed', { error: error instanceof Error ? error.message : String(error) });
@@ -227,76 +234,21 @@ function resolveIconPath(): string {
   return app.isPackaged ? join(process.resourcesPath, 'icon.png') : resolve(__dirname, '..', '..', 'resources', 'icon.png');
 }
 
-/**
- * First-run import (Flow A): copy the Qt data, migrate the copy, then relaunch so
- * every service opens the imported database. The Qt files are never modified.
- */
-async function runLegacyImport(): Promise<PublicSettingsDto> {
-  const current = state;
-  if (!current) throw appError('DATABASE_ERROR', 'The application is not ready yet.');
-  if (current.shuttingDown) throw appError('JOB_CANCELLED', 'The application is shutting down.');
-
-  // Release the catalog before its file is replaced on disk.
-  closeDatabase(current.db);
-
-  if (current.createdFreshDatabase) {
-    // This session created an empty catalog; remove it so the import can copy in.
-    for (const suffix of ['', '-wal', '-shm']) {
-      try {
-        rmSync(`${current.paths.databaseFile}${suffix}`, { force: true });
-      } catch {
-        /* the file may not exist */
-      }
-    }
-  }
-
-  const result = importLegacyData({
-    legacyDir: legacyAppDir(),
-    paths: current.paths,
-    settings: current.settings.getFull(),
-  });
-
-  const copy = openDatabase(current.paths.databaseFile);
-  try {
-    const migration = runMigrations(copy, current.paths.databaseFile);
-    current.logger.info('legacy.imported', {
-      migrated: migration.applied,
-      database: result.imported.database,
-      settings: result.imported.settings,
-      imageCacheFiles: result.imported.imageCacheFiles,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    current.logger.error('legacy.migrationFailed', { error: message });
-    closeDatabase(copy);
-    throw appError('DATABASE_ERROR', `The imported catalog could not be upgraded: ${message}`);
-  }
-  closeDatabase(copy);
-
-  const { schemaVersion: _schemaVersion, ...patch } = result.settings;
-  const publicSettings = current.settings.update(patch);
-  current.logger.info('legacy.restarting');
-
-  app.relaunch();
-  app.exit(0);
-  return publicSettings;
-}
-
-/** Shutdown order from spec 01. */
 async function shutdown(): Promise<void> {
   const current = state;
   if (!current || current.shuttingDown) return;
   current.shuttingDown = true;
+  rejectNewIpcWork();
   try {
-    current.mtp.stop();
-    await current.httpServer.stop();
     current.scanner.shutdown();
     current.install.shutdown();
-    // Let an in-flight transfer settle before the handle closes.
-    await current.install.whenIdle();
-    closeDatabase(current.db);
-    current.logger.info('app.shutdown');
+    await Promise.all([current.scanner.whenIdle(), current.install.whenIdle()]);
+    current.mtp.stop();
+    await current.httpServer.stop();
   } catch (error) {
     current.logger.error('app.shutdownFailed', { error: error instanceof Error ? error.message : String(error) });
+  } finally {
+    closeDatabase(current.db);
+    current.logger.info('app.shutdown');
   }
 }

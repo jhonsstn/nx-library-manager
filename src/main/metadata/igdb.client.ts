@@ -18,7 +18,7 @@ const PROVIDER = 'igdb';
 const REQUEST_TIMEOUT_MS = 20_000;
 const SEARCH_LIMIT = 10;
 
-/** Fields the Qt build requests; IGDB answers with exactly these shapes. */
+/** Fields requested from IGDB. */
 const SEARCH_FIELDS =
   'fields name,summary,first_release_date,' +
   'cover.url,screenshots.url,genres.name,videos.video_id,' +

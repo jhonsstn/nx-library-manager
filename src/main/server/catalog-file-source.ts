@@ -2,7 +2,7 @@
  * Read seam between the DBI HTTP server and the catalog database.
  *
  * The server may only serve files that are already indexed in SQLite
- * (`migration-spec/backend/09-dbi-http-server.md`: "A request may only resolve to
+ * (`docs/backend/09-dbi-http-server.md`: "A request may only resolve to
  * a row already indexed in SQLite"). Implemented by the repository layer.
  */
 export interface CatalogFileRecord {

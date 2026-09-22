@@ -1,5 +1,6 @@
 import { useAppVersion, useHttpServerStatus, useInstallJobs, useMtpStatus } from '../query/hooks';
 import { useToast } from './Toast';
+import { useAppEvents } from '../query/AppEventsProvider';
 
 /** Bottom status strip: Switch connection, DBI URL, install activity, version. */
 export function StatusBar() {
@@ -8,6 +9,7 @@ export function StatusBar() {
   const mtp = useMtpStatus();
   const server = useHttpServerStatus();
   const jobs = useInstallJobs();
+  const { shutdownStatus } = useAppEvents();
 
   const activeJobs = (jobs.data ?? []).filter((job) => job.status === 'pending' || job.status === 'running');
   const mtpText = mtp.data?.available ? mtp.data.statusText : 'No Switch detected';
@@ -38,7 +40,9 @@ export function StatusBar() {
         )}
       </span>
       <span className="status-bar__spacer" />
-      {activeJobs.length > 0 ? (
+      {shutdownStatus ? (
+        <span aria-live="assertive">{shutdownStatus.message}</span>
+      ) : activeJobs.length > 0 ? (
         <span aria-live="polite">
           Installing {activeJobs.length} file{activeJobs.length === 1 ? '' : 's'}…
         </span>

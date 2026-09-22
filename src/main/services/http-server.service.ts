@@ -90,12 +90,7 @@ export class HttpServerService {
   async applySettings(): Promise<HttpServerStatusDto> {
     const settings = this.settings();
     if (!settings.httpServerEnabled) return this.stop();
-    try {
-      return await this.start();
-    } catch {
-      // `start` already published the failure status; Settings surfaces the error.
-      return this.getStatus();
-    }
+    return this.start();
   }
 
   private buildStatus(settings: AppSettings, port: number): HttpServerStatusDto {

@@ -218,7 +218,7 @@ describe('GameDetailsPane', () => {
     const confirm = await screen.findByRole('dialog', { name: 'Delete update files' });
     expect(confirm).toHaveTextContent('Zelda [UPD][v131072].nsp');
     await user.click(within(confirm).getByRole('button', { name: 'Delete from disk' }));
-    await waitFor(() => expect(deleteFile).toHaveBeenCalledWith([{ kind: 'update', id: 12 }]));
+    await waitFor(() => expect(deleteFile).toHaveBeenCalledWith([{ kind: 'update', updateId: 12 }]));
 
     fireEvent.contextMenu(screen.getByRole('option', { name: 'Zelda [UPD][v131072].nsp (v131072) (v2.0)' }));
     await user.click(

@@ -168,7 +168,7 @@ export function LibraryPage() {
             setDeleteTarget(null);
             if (!file) return;
             deleteFile.mutate(
-              { kind: 'game', id: file.id },
+              { kind: 'game', gameId: deleteTarget.id },
               {
                 onSuccess: () => toast.success('Game file deleted', file.filePath),
                 onError: (error) => toast.error('Could not delete the game file', errorMessage(error)),

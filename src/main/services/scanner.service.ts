@@ -3,7 +3,8 @@ import { statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { ScanInput } from '../../shared/contracts/api';
 import { DEFAULT_FUZZY_MATCH_THRESHOLD } from '../../shared/constants';
-import { appError } from '../../shared/errors/app-error';
+import { appError, toAppErrorDto } from '../../shared/errors/app-error';
+import type { AppErrorDto } from '../../shared/errors/codes';
 import type { JobStartedDto, ScanCompletedDto, ScanProgressDto, ScanStatusDto } from '../../shared/types/domain';
 import type { AppDatabase } from '../db/database';
 import { withTransaction } from '../db/database';
@@ -89,8 +90,7 @@ export class ScannerService {
       });
     }
 
-    // Legacy "Rescan": wipe catalog rows before scanning. Opt-in, because it
-    // discards favourites, metadata and manual matches.
+    // An explicit reset discards favourites, metadata and manual matches.
     if (input.resetLibrary === true) {
       withTransaction(this.db, () => resetLibrary(this.db));
     }
@@ -141,6 +141,15 @@ export class ScannerService {
     };
   }
 
+  get isBusy(): boolean {
+    return this.active !== null && !this.active.finished;
+  }
+
+  async whenIdle(): Promise<void> {
+    const run = this.active?.runPromise;
+    if (run) await run;
+  }
+
   /**
    * App shutdown hook: cancels the active scan and blocks further ones. The
    * transaction already running is allowed to finish, so the catalog stays
@@ -189,16 +198,16 @@ export class ScannerService {
       }
       job.record({ candidateFiles: baseEntries.length + updateEntries.length });
 
-      if (job.isCancelled) return this.complete(entry, flusher, unmatchedUpdates);
+      if (job.isCancelled) return this.complete(entry, flusher, unmatchedUpdates, null);
 
       job.setPhase('classifying');
       tick();
       const classified = classifyEntries(baseEntries, updateEntries, scope.mode, job);
-      if (job.isCancelled) return this.complete(entry, flusher, unmatchedUpdates);
+      if (job.isCancelled) return this.complete(entry, flusher, unmatchedUpdates, null);
 
       job.setPhase('matching');
       tick();
-      if (job.isCancelled) return this.complete(entry, flusher, unmatchedUpdates);
+      if (job.isCancelled) return this.complete(entry, flusher, unmatchedUpdates, null);
 
       let reportedGames = 0;
       let reportedUpdates = 0;
@@ -227,23 +236,34 @@ export class ScannerService {
         updatesFound: summary.updatesFound - reportedUpdates,
       });
       unmatchedUpdates = summary.unmatchedUpdates;
-      return this.complete(entry, flusher, unmatchedUpdates);
+      return this.complete(entry, flusher, unmatchedUpdates, null);
     } catch (error) {
+      const failure = toAppErrorDto(error);
+      if (job.isCancelled && failure.code === 'JOB_CANCELLED') {
+        return this.complete(entry, flusher, unmatchedUpdates, null);
+      }
       this.logger?.error('scan.failed', {
         jobId: job.id,
-        reason: error instanceof Error ? error.message : String(error),
+        code: failure.code,
+        reason: failure.message,
       });
-      return this.complete(entry, flusher, unmatchedUpdates);
+      return this.complete(entry, flusher, unmatchedUpdates, failure);
     }
   }
 
-  private complete(entry: ActiveScan, flusher: ProgressFlusher, unmatchedUpdates: number): void {
+  private complete(
+    entry: ActiveScan,
+    flusher: ProgressFlusher,
+    unmatchedUpdates: number,
+    error: AppErrorDto | null,
+  ): void {
     if (entry.finished) return;
     const { job } = entry;
     const summary = job.finish({
       cancelled: job.isCancelled,
       unmatchedUpdates,
       elapsedMs: Math.max(0, this.now() - job.startedAt),
+      error,
     });
     entry.finished = true;
     entry.summary = summary;
@@ -259,7 +279,8 @@ export class ScannerService {
       unmatchedUpdates: summary.unmatchedUpdates,
       elapsedMs: summary.elapsedMs,
     };
-    if (summary.cancelled) this.logger?.info('scan.cancelled', fields);
+    if (summary.error) this.logger?.error('scan.completedWithError', { ...fields, error: summary.error });
+    else if (summary.cancelled) this.logger?.info('scan.cancelled', fields);
     else this.logger?.info('scan.completed', fields);
   }
 

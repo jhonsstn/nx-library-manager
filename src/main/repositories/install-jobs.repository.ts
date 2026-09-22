@@ -33,10 +33,6 @@ export function isTerminalStatus(status: InstallJobStatus): boolean {
   return TERMINAL_STATUSES.includes(status);
 }
 
-/**
- * Rows written by the Qt build only stored the destination folder. Infer the DTO
- * destination type from the stored shape so install history stays readable.
- */
 export function inferDestinationType(row: Pick<InstallJobRow, 'destination_type' | 'destination_folder' | 'destination_label'>): InstallDestinationType {
   const stored = row.destination_type;
   if (stored === 'folder' || stored === 'mtp-sd' || stored === 'mtp-nand') return stored;
@@ -69,14 +65,13 @@ export function toInstallJobDto(row: InstallJobRow): InstallJobDto {
   };
 }
 
-/** Qt stored a plain message; the DTO carries a full envelope. */
 function parseStoredError(value: string | null): AppErrorDto | null {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as AppErrorDto;
     if (parsed && typeof parsed === 'object' && typeof parsed.code === 'string') return parsed;
   } catch {
-    /* plain message from the Qt build */
+    /* tolerate an older plain-text Electron error */
   }
   return { code: 'UNKNOWN_ERROR', message: value };
 }

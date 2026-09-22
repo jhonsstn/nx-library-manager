@@ -15,10 +15,6 @@ import {
   toStorageInfoDto,
 } from '@main/mtp/mtp-status';
 
-import fixture from '../../fixtures/legacy/behavior.json';
-
-const formatBytesFixture = fixture.ui.formatBytes as Record<string, string>;
-
 const GB5 = 5_368_709_120;
 const TB3 = 3_298_534_883_328;
 
@@ -42,7 +38,7 @@ describe('normalizeShellComparePath', () => {
 });
 
 describe('formatMtpStorageStatus', () => {
-  it('orders NAND before SD before other stores and formats sizes like the Qt build', () => {
+  it('orders NAND before SD before other stores and formats sizes', () => {
     const text = formatMtpStorageStatus([
       destination({ name: 'Other volume', freeBytes: 512, totalBytes: 1023 }),
       destination({ id: 'sd', name: 'SD install', freeBytes: GB5, totalBytes: TB3 }),
@@ -50,9 +46,9 @@ describe('formatMtpStorageStatus', () => {
     ]);
     expect(text).toBe(
       [
-        `NAND install: ${formatBytesFixture['1048576']} free / ${formatBytesFixture['1536']}`,
-        `SD install: ${formatBytesFixture['5368709120']} free / ${formatBytesFixture['3298534883328']}`,
-        `Other volume: ${formatBytesFixture['512']} free / ${formatBytesFixture['1023']}`,
+        'NAND install: 1.0 MB free / 1.5 KB',
+        'SD install: 5.0 GB free / 3.0 TB',
+        'Other volume: 512.0 B free / 1023.0 B',
       ].join(' | '),
     );
   });

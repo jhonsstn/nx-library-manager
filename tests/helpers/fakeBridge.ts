@@ -3,6 +3,7 @@ import type { AppErrorDto } from '@shared/errors/codes';
 import type { IpcResult } from '@shared/contracts/ipc';
 
 export type FakeHandler = (args: unknown[]) => unknown;
+const bridgeSubscriptions = new WeakMap<IpcBridge, Map<string, (payload: unknown) => void>>();
 
 /**
  * In-memory transport for renderer tests. Handlers are keyed by IPC channel;
@@ -12,7 +13,7 @@ export type FakeHandler = (args: unknown[]) => unknown;
 export function createFakeBridge(handlers: Record<string, FakeHandler>): IpcBridge {
   const subscriptions = new Map<string, (payload: unknown) => void>();
 
-  return {
+  const bridge: IpcBridge = {
     async invoke<T>(channel: string, args: unknown[]): Promise<IpcResult<T>> {
       const handler = handlers[channel];
       if (!handler) {
@@ -36,14 +37,11 @@ export function createFakeBridge(handlers: Record<string, FakeHandler>): IpcBrid
       subscriptions.delete(channel);
     },
   };
+  bridgeSubscriptions.set(bridge, subscriptions);
+  return bridge;
 }
 
 /** Pushes a main-process event into a bridge created by `createFakeBridge`. */
 export function emitFakeEvent(bridge: IpcBridge, channel: string, payload: unknown): void {
-  // `subscribe` stores the dispatcher; re-subscribing is how tests reach it.
-  let captured: ((value: unknown) => void) | null = null;
-  bridge.subscribe(channel, (value) => {
-    captured = value as (value: unknown) => void;
-  });
-  if (captured) (captured as unknown as (value: unknown) => void)(payload);
+  bridgeSubscriptions.get(bridge)?.get(channel)?.(payload);
 }

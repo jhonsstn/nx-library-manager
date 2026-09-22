@@ -6,7 +6,6 @@ import type {
   HttpServerStatusDto,
   InstallJobDto,
   JobStartedDto,
-  LegacyDataInfoDto,
   MetadataBulkProgressDto,
   MetadataCandidateDto,
   MtpStatusDto,
@@ -14,6 +13,7 @@ import type {
   ScanCompletedDto,
   ScanProgressDto,
   ScanStatusDto,
+  ShutdownStatusDto,
 } from '../types/domain';
 import type { PublicSettingsDto, SettingsUpdateInput } from '../types/settings';
 import type { DeleteFileResultDto } from './results';
@@ -34,7 +34,7 @@ export interface ScanInput {
   updatesFolder?: string;
   recursive?: boolean;
   threshold?: number;
-  /** Wipes catalog rows before scanning (legacy "Rescan" behavior). Defaults to false. */
+  /** Wipes catalog rows before scanning. Defaults to false. */
   resetLibrary?: boolean;
 }
 
@@ -57,17 +57,11 @@ export interface CreateInstallInput {
   destination: InstallDestination;
 }
 
-export interface DeleteFileInput {
-  kind: 'game' | 'update';
-  id: number;
-}
+export type DeleteFileInput = { kind: 'game'; gameId: number } | { kind: 'update'; updateId: number };
 
-export interface MoveFileInput {
-  kind: 'game' | 'update';
-  id: number;
-  /** Destination folder as resolved by `files.chooseDirectory`. */
-  destinationFolder: string;
-}
+export type MoveFileInput =
+  | { kind: 'game'; gameId: number; destinationFolder: string }
+  | { kind: 'update'; updateId: number; destinationFolder: string };
 
 export interface AssignUpdatesInput {
   gameId: number;
@@ -148,9 +142,8 @@ export interface SwitchCatalogApi {
     getPlatform(): Promise<string>;
     checkForUpdates(): Promise<AppUpdateStatusDto>;
     openExternal(url: string): Promise<void>;
-    getLegacyDataInfo(): Promise<LegacyDataInfoDto>;
-    importLegacyData(): Promise<PublicSettingsDto>;
-    skipLegacyImport(): Promise<PublicSettingsDto>;
+    onVersionsChanged(listener: () => void): Promise<() => void>;
+    onShutdownStatus(listener: (event: ShutdownStatusDto) => void): Promise<() => void>;
   };
 }
 

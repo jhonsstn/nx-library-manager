@@ -1,6 +1,4 @@
 import type { AppDatabase } from '../db/database';
-import type { LegacyDataInfoDto } from '../../shared/types/domain';
-import type { PublicSettingsDto } from '../../shared/types/settings';
 import type { Logger } from '../lifecycle/logger';
 import type { AppPaths } from '../platform/paths';
 import type { SettingsStore } from '../settings/settings.store';
@@ -28,11 +26,5 @@ export interface IpcDeps {
   httpServer: HttpServerService;
   appUpdate: AppUpdateService;
   currentVersion: string;
-  /** Legacy-data lifecycle lives in `main/index.ts`, which owns DB reopen/restart. */
-  legacy: {
-    info: () => LegacyDataInfoDto;
-    import: () => Promise<PublicSettingsDto>;
-    skip: () => PublicSettingsDto;
-  };
   emit: (channel: string, payload: unknown) => void;
 }

@@ -3,7 +3,7 @@
  *
  * Exact ports of `_parse_range` and `_content_disposition` from
  * `switch_catalog/http_server.py`; kept free of I/O so they can be unit tested
- * against the captured legacy fixtures.
+ * through focused range-request tests.
  */
 
 import { quotePathComponent } from './directory-listing';

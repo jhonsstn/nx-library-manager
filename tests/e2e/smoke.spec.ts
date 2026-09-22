@@ -38,15 +38,6 @@ async function launch(): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
 }
 
-/** The first-run prompt only appears when Qt-era data exists on this machine. */
-async function dismissLegacyImportIfPresent(): Promise<void> {
-  const dialog = page.getByRole('dialog', { name: 'Existing Switch Game Catalog data found' });
-  if (await dialog.isVisible().catch(() => false)) {
-    await dialog.getByRole('button', { name: 'Start Fresh' }).click();
-    await expect(dialog).toBeHidden();
-  }
-}
-
 test.beforeAll(async () => {
   userDataDir = mkdtempSync(join(tmpdir(), 'sgc-e2e-userdata-'));
   libraryDir = mkdtempSync(join(tmpdir(), 'sgc-e2e-library-'));
@@ -61,7 +52,6 @@ test.beforeAll(async () => {
   writeFileSync(join(updatesDir, 'Unknown Thing [v65536].nsp'), Buffer.alloc(1024));
 
   await launch();
-  await dismissLegacyImportIfPresent();
 });
 
 test.afterAll(async () => {
@@ -133,7 +123,6 @@ test('favorites persist across a restart, and the DBI server starts and stops', 
   await app.close();
 
   await launch();
-  await dismissLegacyImportIfPresent();
   await page.getByRole('link', { name: 'Library' }).click();
   await gameRow('Hades').click();
   await expect(page.getByRole('button', { name: 'Remove favorite' })).toBeVisible();

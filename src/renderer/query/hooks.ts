@@ -69,14 +69,6 @@ export function useAppVersion() {
   return useQuery({ queryKey: queryKeys.appVersion(), queryFn: () => getCatalogApi().app.getVersion() });
 }
 
-export function useLegacyDataInfo(enabled = true) {
-  return useQuery({
-    queryKey: queryKeys.legacyDataInfo(),
-    queryFn: () => getCatalogApi().app.getLegacyDataInfo(),
-    enabled,
-  });
-}
-
 /* -------------------------------------------------------------- mutations */
 
 /** Invalidates every catalog-shaped query after a mutation. */

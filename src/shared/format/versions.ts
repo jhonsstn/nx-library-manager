@@ -1,9 +1,6 @@
 import type { InstalledStatusDto, UpdateStatusKind, VersionInfoDto, VersionStatusDto } from '../types/domain';
 
-/**
- * Version helpers. Ports `versions.py` and the version-related helpers in
- * `ui.py` so label text and numeric comparisons match the Qt implementation.
- */
+/** Version parsing, formatting, and comparison helpers. */
 
 /** Splits a packed Switch version into major/minor/patch. */
 export function rawVersionToDotted(version: number): string {
@@ -18,7 +15,7 @@ function toInteger(value: number | string): number | null {
   return /^[+-]?\d+$/.test(value.trim()) ? Number.parseInt(value, 10) : null;
 }
 
-/** `v65536 (1.0.0)`; non-numeric input is echoed back like Python's `str(version)`. */
+/** `v65536 (1.0.0)`; non-numeric input is returned as text. */
 export function versionLabel(version: number | string): string {
   const value = toInteger(version);
   if (value === null) return String(version);
@@ -39,7 +36,7 @@ export function compactDottedVersion(dotted: string): string {
 
 /**
  * Converts a filename-detected version string into the packed numeric form.
- * Ports `versions.file_version_number` / `ui._detected_raw_version`.
+ * Dotted inputs are packed as major/minor/patch; small integers are major versions.
  */
 export function rawVersionFromVersionText(text: string): number {
   if (!text) return 0;
@@ -57,7 +54,7 @@ export function rawVersionFromVersionText(text: string): number {
   return value;
 }
 
-/** `" (v65536) (v1.0)"` — the suffix the Qt build appends to update file names. */
+/** `" (v65536) (v1.0)"` — the suffix shown beside update file names. */
 export function detectedVersionSuffix(detected: string): string {
   if (!detected) return '';
   const raw = rawVersionFromVersionText(detected);

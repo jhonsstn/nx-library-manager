@@ -72,7 +72,7 @@ export class CatalogService {
 
   /**
    * Applies the SQL filters, then the version-dependent `needsUpdate` filter,
-   * then paging — matching the Qt build, where the update check ran after the
+   * then paging, with update availability applied after the
    * query instead of inside it.
    */
   listGames(input: ListGamesInput = {}): PagedResult<GameSummaryDto> {
@@ -151,7 +151,7 @@ export class CatalogService {
     setNeedsReview(this.db, gameId, value);
   }
 
-  /** Ports the Qt "Mark as DLC/update" action: game row out, unmatched update in. */
+  /** Moves a game row out of the catalog and reclassifies its file as unmatched update/DLC. */
   markAsUpdate(gameId: number): void {
     const baseFile = getBaseFile(this.db, gameId);
     if (!baseFile) throw appError('NOT_FOUND', `No base game file recorded for game ${gameId}.`);
@@ -198,7 +198,7 @@ export class CatalogService {
     }));
   }
 
-  /** Copy of the SQLite database to a chosen path (Qt "Export catalog backup"). */
+  /** Copies the SQLite database to a chosen backup path. */
   async backupTo(targetPath: string): Promise<void> {
     try {
       await this.db.backup(targetPath);

@@ -1,12 +1,10 @@
 import { mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 /**
  * User-data layout owned by the Electron app.
  *
- * Mirrors `migration-spec/data/11-settings-and-user-data.md`. The Electron
- * build takes `userDataDir` from `app.getPath('userData')`; keeping the
+ * Electron takes `userDataDir` from `app.getPath('userData')`; keeping the
  * resolution pure means path handling stays testable without Electron.
  */
 export interface AppPaths {
@@ -21,11 +19,6 @@ export interface AppPaths {
   versionsJsonFile: string;
   versionsTxtFile: string;
   serverLogFile: string;
-}
-
-/** Qt-era application directory (`~/.switch_library_catalog`). Never mutated. */
-export function legacyAppDir(home = homedir()): string {
-  return join(home, '.switch_library_catalog');
 }
 
 export function resolveAppPaths(userDataDir: string): AppPaths {
@@ -64,5 +57,5 @@ export function backupFileName(databaseFile: string, now = new Date()): string {
   const stamp =
     `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
     `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  return `${databaseFile}.pre-electron-${stamp}.bak`;
+  return `${databaseFile}.pre-migration-${stamp}.bak`;
 }

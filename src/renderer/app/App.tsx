@@ -6,7 +6,6 @@ import { GridPage } from '../pages/GridPage';
 import { FavoritesPage } from '../pages/FavoritesPage';
 import { UnmatchedPage } from '../pages/UnmatchedPage';
 import { SettingsPage } from '../pages/SettingsPage';
-import { FirstRunImportDialog } from '../features/migration/FirstRunImportDialog';
 import { StartupUpdateCheck } from './StartupUpdateCheck';
 import { useUpdates } from '../query/hooks';
 
@@ -18,8 +17,7 @@ const NAV_ITEMS = [
 
 /**
  * Application shell: persistent sidebar plus route content (spec 12). The
- * Unmatched entry only appears while unmatched files exist, matching the Qt
- * behaviour of hiding the tab once everything is matched.
+ * Unmatched entry only appears while unmatched files exist.
  */
 export function App() {
   const unmatched = useUpdates({ unmatchedOnly: true });
@@ -69,7 +67,6 @@ export function App() {
         </main>
 
         <StatusBar />
-        <FirstRunImportDialog />
         <StartupUpdateCheck />
       </div>
     </SelectionProvider>

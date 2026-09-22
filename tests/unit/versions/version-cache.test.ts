@@ -3,7 +3,12 @@ import { dirname, join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { isCacheStale, loadVersionRecords, versionCacheIsStale } from '@main/versions/version-cache';
+import {
+  isCacheStale,
+  loadVersionRecords,
+  readCachedVersionRecords,
+  versionCacheIsStale,
+} from '@main/versions/version-cache';
 import type { VersionCachePaths } from '@main/versions/version-cache';
 import {
   TITLEDB_CACHE_MAX_AGE_MS,
@@ -113,6 +118,13 @@ describe('versionCacheIsStale', () => {
 });
 
 describe('loadVersionRecords', () => {
+  it('makes existing cache records available synchronously', () => {
+    const paths = casePaths();
+    writeFreshCache(paths, CACHED_JSON, CACHED_TXT);
+
+    expect(readCachedVersionRecords(paths)).toEqual(MERGED_CACHED);
+  });
+
   it('uses a fresh cache without fetching', async () => {
     const paths = casePaths();
     writeFreshCache(paths, CACHED_JSON, CACHED_TXT);
@@ -188,6 +200,22 @@ describe('loadVersionRecords', () => {
     expect(result.refreshed).toBe(false);
     expect(result.error?.code).toBe('NETWORK_ERROR');
     expect(result.error?.message).toContain(TITLEDB_VERSIONS_URL);
+    expect(result.versions).toEqual(MERGED_CACHED);
+    expect(readFileSync(paths.versionsJsonFile, 'utf8')).toBe(CACHED_JSON);
+    expect(readFileSync(paths.versionsTxtFile, 'utf8')).toBe(CACHED_TXT);
+  });
+
+  it('preserves the previous cache when downloads contain no valid records', async () => {
+    const paths = casePaths();
+    writeFreshCache(paths, CACHED_JSON, CACHED_TXT);
+    const fetch = recordingFetch(async (url) =>
+      new Response(url === TITLEDB_VERSIONS_URL ? '[]' : 'not|a|usable version', { status: 200 }),
+    );
+
+    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, refresh: true });
+
+    expect(result.refreshed).toBe(false);
+    expect(result.error?.code).toBe('NETWORK_ERROR');
     expect(result.versions).toEqual(MERGED_CACHED);
     expect(readFileSync(paths.versionsJsonFile, 'utf8')).toBe(CACHED_JSON);
     expect(readFileSync(paths.versionsTxtFile, 'utf8')).toBe(CACHED_TXT);

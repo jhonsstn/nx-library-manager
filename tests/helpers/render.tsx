@@ -7,11 +7,13 @@ import { ToastProvider } from '@renderer/components/Toast';
 import { SelectionProvider } from '@renderer/app/SelectionProvider';
 import { configureCatalogBridge } from '@renderer/api';
 import { createFakeBridge, type FakeHandler } from './fakeBridge';
+import type { IpcBridge } from '@shared/contracts/bridge';
 
 export interface RenderOptions {
   route?: string;
   handlers?: Record<string, FakeHandler>;
   withSelection?: boolean;
+  bridge?: IpcBridge;
 }
 
 /**
@@ -19,7 +21,7 @@ export interface RenderOptions {
  * Queries never retry, so failures surface immediately in assertions.
  */
 export function renderWithProviders(ui: ReactElement, options: RenderOptions = {}): RenderResult {
-  configureCatalogBridge(() => createFakeBridge(options.handlers ?? {}));
+  configureCatalogBridge(() => options.bridge ?? createFakeBridge(options.handlers ?? {}));
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   });

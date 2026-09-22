@@ -5,7 +5,7 @@ export type CatalogImageKind = 'covers' | 'screenshots';
 
 /**
  * Cached artwork is served through a dedicated scheme so the renderer never gets
- * a filesystem capability (`migration-spec/backend/07-metadata-service.md`).
+ * a filesystem capability (`docs/backend/07-metadata-service.md`).
  */
 export function catalogImageUrl(kind: CatalogImageKind, fileName: string): string {
   return `${CATALOG_IMAGE_SCHEME}://${kind}/${encodeURIComponent(fileName)}`;

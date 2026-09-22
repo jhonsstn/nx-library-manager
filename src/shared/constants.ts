@@ -27,10 +27,10 @@ export const RELEASES_PAGE_URL = 'https://github.com/Theuniquejimmy/SwitchGameCa
 
 export const CATALOG_IMAGE_SCHEME = 'catalog-image';
 
-/** MTP status polling cadence; mirrors the Qt build's 60s refresh timer. */
+/** MTP status polling cadence. */
 export const MTP_STATUS_REFRESH_MS = 60_000;
 export const MTP_STATUS_TIMEOUT_SECONDS = 8;
-/** Legacy transfer timeout used by the PowerShell adapter. */
+/** Transfer timeout used by the PowerShell adapter. */
 export const MTP_TRANSFER_TIMEOUT_SECONDS = 1800;
 
 export const LOG_ROTATION_MAX_FILES = 5;

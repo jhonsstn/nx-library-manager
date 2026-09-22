@@ -49,7 +49,6 @@ const SETTINGS: PublicSettingsDto = {
   defaultInstallFolder: '/install',
   installFolderLabel: '',
   gridCoverSize: 170,
-  legacyImportDismissed: false,
   igdbClientSecretConfigured: false,
   httpServerPasswordConfigured: false,
 };
@@ -150,7 +149,7 @@ describe('UnmatchedPage', () => {
     expect(deleted).toEqual([]);
 
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
-    await waitFor(() => expect(deleted).toEqual([{ kind: 'update', id: 1 }]));
+    await waitFor(() => expect(deleted).toEqual([{ kind: 'update', updateId: 1 }]));
   });
 
   it('opens the install dialog without a game id and only installs after confirmation', async () => {

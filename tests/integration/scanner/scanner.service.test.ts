@@ -343,6 +343,21 @@ describe('ScannerService', () => {
     });
   });
 
+  it('emits a structured failure and becomes idle when background work fails', async () => {
+    const completion = nextCompletion();
+    const { jobId } = await service.start({ baseFolder: baseDir, updatesFolder: updatesDir });
+    closeDatabase(db);
+
+    const summary = await completion;
+    await service.whenIdle();
+
+    expect(summary.jobId).toBe(jobId);
+    expect(summary.cancelled).toBe(false);
+    expect(summary.error).toMatchObject({ code: 'UNKNOWN_ERROR' });
+    expect(service.isBusy).toBe(false);
+    expect(await service.getStatus(jobId)).toMatchObject({ running: false, summary });
+  });
+
   it('throttles progress events but always delivers the terminal event', async () => {
     const frozenProgress: ScanProgressDto[] = [];
     service = createService({

@@ -8,13 +8,10 @@ export interface Migration {
   up: (db: AppDatabase) => void;
 }
 
-/**
- * Migration 1 recreates the Qt-era schema verbatim so a database created by
- * either application is byte-compatible in shape. Later migrations only extend.
- */
-const legacyBaseline: Migration = {
+/** Complete schema for a fresh standalone Electron installation. */
+const initialSchema: Migration = {
   version: 1,
-  name: 'legacy-baseline',
+  name: 'initial-schema',
   up: (db) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS games (
@@ -69,11 +66,13 @@ const legacyBaseline: Migration = {
           destination_path TEXT,
           destination_folder TEXT NOT NULL,
           destination_label TEXT,
+          destination_type TEXT NOT NULL,
           file_name TEXT NOT NULL,
           file_size INTEGER NOT NULL DEFAULT 0,
           file_kind TEXT NOT NULL,
           detected_version TEXT,
           raw_version INTEGER NOT NULL DEFAULT 0,
+          transferred_bytes INTEGER NOT NULL DEFAULT 0,
           status TEXT NOT NULL,
           error TEXT,
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -97,30 +96,6 @@ const legacyBaseline: Migration = {
           cached_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(provider, query)
       );
-    `);
-    ensureColumn(db, 'updates', 'manual_match', 'INTEGER NOT NULL DEFAULT 0');
-    ensureColumn(db, 'games', 'favorite', 'INTEGER NOT NULL DEFAULT 0');
-    ensureColumn(db, 'games', 'trailer_url', 'TEXT');
-  },
-};
-
-/**
- * Migration 2 adds Electron-only columns and indexes, and normalizes the Qt
- * install-job statuses onto the DTO vocabulary (`running`/`completed`).
- */
-const electronIndexes: Migration = {
-  version: 2,
-  name: 'electron-indexes-and-install-status',
-  up: (db) => {
-    ensureColumn(db, 'install_jobs', 'destination_type', 'TEXT');
-    ensureColumn(db, 'install_jobs', 'transferred_bytes', 'INTEGER NOT NULL DEFAULT 0');
-    db.exec(`
-      UPDATE install_jobs SET status = CASE status
-        WHEN 'copying' THEN 'running'
-        WHEN 'finished' THEN 'completed'
-        WHEN 'sent' THEN 'completed'
-        ELSE status
-      END;
 
       CREATE INDEX IF NOT EXISTS idx_game_files_game_id ON game_files(game_id);
       CREATE INDEX IF NOT EXISTS idx_game_files_base ON game_files(is_base_game);
@@ -136,14 +111,7 @@ const electronIndexes: Migration = {
   },
 };
 
-export const MIGRATIONS: Migration[] = [legacyBaseline, electronIndexes];
-
-function ensureColumn(db: AppDatabase, table: string, column: string, definition: string): void {
-  const existing = new Set(
-    (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((row) => row.name),
-  );
-  if (!existing.has(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-}
+export const MIGRATIONS: Migration[] = [initialSchema];
 
 export function appliedVersions(db: AppDatabase): number[] {
   db.exec(`
@@ -177,7 +145,9 @@ export function runMigrations(
   const pending = migrations.filter((migration) => !done.has(migration.version)).sort((a, b) => a.version - b.version);
   if (pending.length === 0) return { applied: [], backupFile: null };
 
-  const backupFile = createBackup(databaseFile);
+  // A brand-new database has no user data to protect; backups begin with the
+  // first Electron-to-Electron upgrade.
+  const backupFile = done.size === 0 ? null : createBackup(databaseFile);
   const applied: number[] = [];
   const record = db.prepare('INSERT INTO schema_migrations(version, name) VALUES (?, ?)');
   for (const migration of pending) {

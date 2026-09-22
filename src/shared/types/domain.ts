@@ -134,6 +134,7 @@ export interface ScanCompletedDto {
   updatesFound: number;
   unmatchedUpdates: number;
   elapsedMs: number;
+  error: AppErrorDto | null;
 }
 
 export interface ScanStatusDto {
@@ -227,15 +228,9 @@ export interface AppUpdateStatusDto {
   updateAvailable: boolean;
 }
 
-export interface LegacyDataInfoDto {
-  found: boolean;
-  sourceDirectory: string;
-  databasePresent: boolean;
-  settingsPresent: boolean;
-  games: number;
-  updates: number;
-  favorites: number;
-  error: string | null;
+export interface ShutdownStatusDto {
+  phase: 'waiting' | 'closing';
+  message: string;
 }
 
 export interface FileOperationResultDto {

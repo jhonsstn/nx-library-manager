@@ -28,8 +28,7 @@ interface SettingsStoreOptions {
  * Persists `settings.json` in the user-data directory.
  *
  * The stored form keeps `igdbClientSecret` / `httpServerPassword` as ciphertext;
- * plaintext only ever exists inside this process (and while importing the legacy
- * Qt settings, which stored secrets in the clear).
+ * plaintext only ever exists inside this process.
  */
 export class SettingsStore {
   private readonly paths: AppPaths;
@@ -118,6 +117,19 @@ export class SettingsStore {
     this.writeAtomic(next);
     this.settings = next;
     return this.toPublic(next);
+  }
+
+  /** Captures the encrypted in-memory representation for transactional rollback. */
+  snapshot(): AppSettings {
+    return { ...this.current() };
+  }
+
+  /** Restores a previously captured encrypted snapshot atomically. */
+  restore(snapshot: AppSettings): PublicSettingsDto {
+    const restored = { ...snapshot };
+    this.writeAtomic(restored);
+    this.settings = restored;
+    return this.toPublic(restored);
   }
 
   /** Strips both secrets and reports whether a non-empty value is stored. */

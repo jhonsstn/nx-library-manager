@@ -1,5 +1,5 @@
 /**
- * Stable, user-facing error codes. Mirrors `migration-spec/architecture/03-ipc-contract.md`.
+ * Stable, user-facing error codes. See `docs/architecture/03-ipc-contract.md`.
  */
 export const APP_ERROR_CODES = [
   'VALIDATION_ERROR',

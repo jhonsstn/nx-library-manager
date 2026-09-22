@@ -624,8 +624,7 @@ describe('install queue recovery', () => {
     });
     await service.whenIdle();
 
-    // A folder move cannot be interrupted: it finishes, and the queue behind it stops.
-    expect(getInstallJob(db, jobs[0].id)!.status).toBe('completed');
+    expect(getInstallJob(db, jobs[0].id)!.status).toBe('cancelled');
     expect(getInstallJob(db, jobs[1].id)!.status).toBe('pending');
     expect(getInstallJob(db, jobs[2].id)!.status).toBe('pending');
     expect(existsSync(early.path)).toBe(true);

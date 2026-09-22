@@ -72,7 +72,7 @@ export function UnmatchedPage() {
     let deleted = 0;
     for (const row of targets) {
       try {
-        const result = await files.deleteFile.mutateAsync({ kind: 'update', id: row.id });
+        const result = await files.deleteFile.mutateAsync({ kind: 'update', updateId: row.id });
         if (result.deletedFromDisk) deleted += 1;
       } catch (error) {
         toast.error('Delete failed', messageOf(error));

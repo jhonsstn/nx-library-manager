@@ -57,7 +57,7 @@ export function matchUpdateByTitleId(fileName: string, games: MatchCandidateGame
 
 /**
  * `_match_update`: title-ID relation first, then the best fuzzy score over each
- * game's cleaned and display titles. Ties keep the earliest game, like Python's
+ * game's cleaned and display titles. Ties keep the earliest game because
  * strict `score > best_score`.
  */
 export function matchUpdate(fileName: string, games: MatchCandidateGame[]): UpdateMatch {

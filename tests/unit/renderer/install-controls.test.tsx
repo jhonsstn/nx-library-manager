@@ -111,7 +111,6 @@ function settingsWith(overrides: Partial<PublicSettingsDto> = {}): PublicSetting
     defaultInstallFolder: '/install',
     installFolderLabel: '',
     gridCoverSize: 170,
-    legacyImportDismissed: true,
     igdbClientSecretConfigured: false,
     httpServerPasswordConfigured: false,
     ...overrides,

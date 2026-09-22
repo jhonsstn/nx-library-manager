@@ -4,11 +4,11 @@ import { sequenceMatcherRatio } from '../../shared/text/similarity';
  * Pure ports of the title-normalization helpers in `switch_catalog/metadata.py`.
  *
  * These run before every IGDB search and on every candidate name, so the
- * confidence scores the UI shows stay comparable with the Qt build's.
+ * confidence scores remain stable across searches.
  */
 
 /**
- * Characters the Qt build folds before matching. Keys are the exotic
+ * Characters folded before matching. Keys are the exotic
  * codepoints, values their ASCII equivalent.
  */
 const TITLE_REPLACEMENTS: Record<string, string> = {

@@ -5,7 +5,7 @@ import type { InstalledStatusDto, VersionInfoDto, VersionStatusDto } from '../..
 import { deriveUpdateStatusKind } from '../../shared/format/versions';
 import { isPathInsideFolder } from '../../shared/format/install';
 import { latestCompletedInstall } from '../repositories/install-jobs.repository';
-import { loadVersionRecords } from '../versions/version-cache';
+import { loadVersionRecords, readCachedVersionRecords } from '../versions/version-cache';
 import { versionStatusInput, type VersionRecords } from '../versions/version-records';
 
 export interface VersionServiceOptions {
@@ -62,6 +62,16 @@ export class VersionService {
     } else if (result.refreshed) {
       this.logger?.info('versions.refreshed', { titleIds: Object.keys(result.versions).length });
     }
+    return this.records;
+  }
+
+  /** Makes cached records available before the renderer window is opened. */
+  loadCached(): VersionRecords {
+    this.records = readCachedVersionRecords({
+      versionsJsonFile: this.paths.versionsJsonFile,
+      versionsTxtFile: this.paths.versionsTxtFile,
+    });
+    this.loaded = true;
     return this.records;
   }
 

@@ -55,9 +55,6 @@ export const IPC = {
     getPlatform: 'app:getPlatform',
     checkForUpdates: 'app:checkForUpdates',
     openExternal: 'app:openExternal',
-    getLegacyDataInfo: 'app:getLegacyDataInfo',
-    importLegacyData: 'app:importLegacyData',
-    skipLegacyImport: 'app:skipLegacyImport',
   },
 } as const;
 
@@ -68,6 +65,8 @@ export const EVENTS = {
   installChanged: 'event:install:changed',
   mtpStatusChanged: 'event:mtp:statusChanged',
   httpServerStatusChanged: 'event:httpServer:statusChanged',
+  versionsChanged: 'event:versions:changed',
+  shutdownStatusChanged: 'event:shutdown:statusChanged',
 } as const;
 
 /**

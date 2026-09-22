@@ -31,9 +31,6 @@ export interface AppSettings {
   installFolderLabel: string;
 
   gridCoverSize: number;
-
-  /** Set once the user answers the first-run legacy import prompt. */
-  legacyImportDismissed: boolean;
 }
 
 /** Renderer-safe projection: secrets are replaced by configured flags. */

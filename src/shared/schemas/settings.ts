@@ -46,7 +46,6 @@ export const AppSettingsSchema = z.object({
   defaultInstallFolder: folder.catch(''),
   installFolderLabel: z.string().catch(''),
   gridCoverSize,
-  legacyImportDismissed: z.boolean().catch(false),
 });
 
 /** Update input: strict (invalid values are a validation error, not a default). */
@@ -70,7 +69,6 @@ export const SettingsUpdateSchema = z
     defaultInstallFolder: z.string(),
     installFolderLabel: z.string(),
     gridCoverSize: z.number().int().min(GRID_COVER_SIZE_MIN).max(GRID_COVER_SIZE_MAX),
-    legacyImportDismissed: z.boolean(),
   })
   .partial()
   .strict();

@@ -1,4 +1,5 @@
 import type { ScanCompletedDto, ScanPhase, ScanProgressDto } from '../../shared/types/domain';
+import type { AppErrorDto } from '../../shared/errors/codes';
 
 /**
  * Scan job state machine and progress throttling (spec 05 "Job model",
@@ -37,6 +38,7 @@ export interface ScanFinishInput {
   cancelled: boolean;
   unmatchedUpdates: number;
   elapsedMs: number;
+  error: AppErrorDto | null;
 }
 
 /**
@@ -157,6 +159,7 @@ export class ScanJob {
       updatesFound: this.updatesFound,
       unmatchedUpdates: input.unmatchedUpdates,
       elapsedMs: input.elapsedMs,
+      error: input.error,
     };
   }
 }

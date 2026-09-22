@@ -58,9 +58,8 @@ describe('isNewerVersion', () => {
     ['v1.0.0', '1.0.0', false],
     ['1.0.0', '1.0.10', false],
     ['1.0.10', '1.0.0', true],
-    // Port parity: `1.0.0-beta.1` yields the parts [1, 0, 0, 1], which the Qt
-    // build compared as newer than [1, 0, 0].
-    ['1.0.0-beta.1', '1.0.0', true],
+    ['1.0.0-beta.1', '1.0.0', false],
+    ['1.0.0', '1.0.0-electron-beta.1', true],
     ['2', '1.9.9', true],
     ['1.0.0', '1.0.0', false],
   ])('%s vs %s -> %s', (candidate, current, expected) => {

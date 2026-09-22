@@ -1,68 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import fixture from '../../fixtures/legacy/behavior.json';
-import { detectedVersionSuffix, rawVersionFromVersionText } from '@shared/format/versions';
 import { classifyGameFile, updateFileGroup } from '@main/scanner/classify-file';
 import {
   cleanTitle,
   detectVersion,
   extractTitleId,
-  isSupportedExtension,
-  isUpdateOrDlcFilename,
   parseSwitchFilename,
   titleIdFamily,
 } from '@main/scanner/filename-parser';
 
-const cases = fixture.filename;
-
-const SUPPORTED_NAME_RE = /\.(nsp|nsz|xci)$/i;
-
-describe('legacy filename fixtures', () => {
-  it.each(cases)('$fileName', (entry) => {
-    expect(detectVersion(entry.fileName)).toBe(entry.detectVersion);
-    expect(extractTitleId(entry.fileName)).toBe(entry.titleId);
-    expect(titleIdFamily(entry.fileName)).toBe(entry.titleIdFamily);
-    expect(isUpdateOrDlcFilename(entry.fileName)).toBe(entry.isUpdateOrDlc);
-    expect(cleanTitle(entry.fileName)).toBe(entry.cleanedTitle);
-    expect(cleanTitle(entry.fileName, { forUpdate: true })).toBe(entry.cleanedTitleForUpdate);
-    expect(updateFileGroup(entry.fileName)).toBe(entry.updateGroup);
-
-    const parsed = parseSwitchFilename(entry.fileName);
-    expect(parsed.originalName).toBe(entry.fileName);
-    expect(parsed.extension).toBe(entry.fileName.split('.').pop()?.toLowerCase());
-    expect(parsed.normalizedTitle).toBe(entry.cleanedTitle);
-    expect(parsed.titleId ?? '').toBe(entry.titleId);
-    expect(parsed.rawVersion ?? '').toBe(entry.detectVersion);
-    // `rawVersion` is the captured `_detected_raw_version(detected) if detected else 0`.
-    expect(rawVersionFromVersionText(parsed.rawVersion ?? '')).toBe(entry.rawVersion);
-    expect(parsed.versionNumber ?? 0).toBe(entry.rawVersion);
-    expect(detectedVersionSuffix(parsed.rawVersion ?? '')).toBe(entry.versionSuffix);
-
-    const supported = SUPPORTED_NAME_RE.test(entry.fileName);
-    expect(isSupportedExtension(entry.fileName)).toBe(supported);
-    const expectedKind = !supported
-      ? 'unknown'
-      : entry.isUpdateOrDlc
-        ? entry.updateGroup === 'DLC'
-          ? 'dlc'
-          : 'update'
-        : 'base';
-    expect(parsed.probableKind).toBe(expectedKind);
-  });
-});
-
 describe('classifyGameFile', () => {
-  it('mirrors the captured update group for every fixture', () => {
-    for (const entry of cases) {
-      const classification = classifyGameFile(entry.fileName);
-      expect(classification.group).toBe(entry.updateGroup);
-      if (SUPPORTED_NAME_RE.test(entry.fileName)) {
-        expect(classification.kind).toBe(
-          entry.isUpdateOrDlc ? (entry.updateGroup === 'DLC' ? 'dlc' : 'update') : 'base',
-        );
-      }
-    }
-  });
-
   it('groups DLC names and DLC content types', () => {
     expect(updateFileGroup('Game [DLC] v1.nsp')).toBe('DLC');
     expect(updateFileGroup('0100ABCDEF123456.nsp')).toBe('DLC');

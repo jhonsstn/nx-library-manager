@@ -8,15 +8,8 @@ import {
   parseVersionsTxt,
   versionStatusInput,
 } from '@main/versions/version-records';
-import { rawVersionFromVersionText, versionLabel } from '@shared/format/versions';
-import type { VersionInfoDto } from '@shared/types/domain';
+import { rawVersionFromVersionText } from '@shared/format/versions';
 
-import fixture from '../../fixtures/legacy/behavior.json';
-
-/**
- * Same shape as the sample recorded in the legacy fixture, so these inputs line
- * up with the expected outputs in `behavior.json`.
- */
 const VERSIONS_TXT_SAMPLE = [
   'id|name|version',
   '0100000000010800|Super Mario Odyssey Update|131072',
@@ -34,10 +27,6 @@ const VERSIONS_JSON_SAMPLE: Record<string, Record<string, string>> = {
 const parsedTxt = parseVersionsTxt(VERSIONS_TXT_SAMPLE);
 
 describe('parseVersionsTxt', () => {
-  it('matches the captured legacy output', () => {
-    expect(parsedTxt).toEqual(fixture.versions.parseVersionsTxt);
-  });
-
   it('maps an update ID onto its base ID keeping the highest version seen', () => {
     expect(parsedTxt['0100000000010800']).toEqual({ '262144': '' });
     expect(parsedTxt['0100000000010000']).toEqual({ '262144': '' });
@@ -93,7 +82,7 @@ describe('baseIdFromUpdateId', () => {
   });
 
   it('round-trips through the update ID and back', () => {
-    for (const titleId of Object.keys(fixture.versions.parseVersionsTxt)) {
+    for (const titleId of Object.keys(parsedTxt)) {
       expect(baseIdFromUpdateId(baseIdFromUpdateId(titleId))).toBe(baseIdFromUpdateId(titleId));
     }
     expect(baseIdFromUpdateId(baseIdFromUpdateId('0100A3A0149EC800'))).toBe('0100A3A0149EC000');
@@ -111,13 +100,23 @@ describe('baseIdFromUpdateId', () => {
 });
 
 describe('mergeVersionRecords', () => {
-  it('yields the captured merged title IDs from the parsed TXT records alone', () => {
-    expect(Object.keys(mergeVersionRecords({}, parsedTxt)).sort()).toEqual(fixture.versions.mergedTitleIds);
+  it('merges parsed TXT title IDs', () => {
+    expect(Object.keys(mergeVersionRecords({}, parsedTxt)).sort()).toEqual([
+      '0100000000010000',
+      '0100000000010800',
+      '0100A3A0149EC000',
+      '0100A3A0149EC800',
+    ]);
   });
 
-  it('yields the captured merged title IDs when JSON records are present', () => {
+  it('merges JSON records with TXT records', () => {
     const merged = mergeVersionRecords(VERSIONS_JSON_SAMPLE, parsedTxt);
-    expect(Object.keys(merged).sort()).toEqual(fixture.versions.mergedTitleIds);
+    expect(Object.keys(merged).sort()).toEqual([
+      '0100000000010000',
+      '0100000000010800',
+      '0100A3A0149EC000',
+      '0100A3A0149EC800',
+    ]);
   });
 
   it('lets JSON records win and fills gaps from TXT', () => {
@@ -225,32 +224,6 @@ describe('newerVersions', () => {
 
 const titleId = '0100A3A0149EC000';
 const mergedJson = mergeVersionRecords(VERSIONS_JSON_SAMPLE, {});
-const updateStatus: Record<string, { text: string; available: Array<{ version: number; release_date: string }> }> =
-  fixture.versions.updateStatus;
-
-/** Current versions implied by the captured `file_version_number` outputs. */
-const updateStatusCases: Array<[string, number]> = [
-  [`${titleId}|none`, 0],
-  [`${titleId}|Super Mario Odyssey [v131072].nsp`, 131072],
-  [`${titleId}|Super Mario Odyssey [v262144].nsp`, 262144],
-];
-
-describe('update status inputs match the captured legacy behavior', () => {
-  it.each(updateStatusCases)('%s', (key, current) => {
-    const captured = updateStatus[key];
-    const expectedAvailable: VersionInfoDto[] = captured.available.map((item) => ({
-      version: item.version,
-      releaseDate: item.release_date,
-    }));
-    const status = versionStatusInput({ localVersions: [current], titleId, versions: mergedJson });
-
-    expect(captured.text.split('\n')[0]).toBe(`Latest Version on File: ${versionLabel(status.localVersion)}`);
-    expect(status.localVersion).toBe(current);
-    expect(status.latest).toEqual({ version: 131072, releaseDate: '2021-01-01' });
-    expect(status.newer).toEqual(expectedAvailable);
-  });
-});
-
 describe('versionStatusInput', () => {
   it('reports zero when no local versions are known', () => {
     const status = versionStatusInput({ localVersions: [], titleId, versions: mergedJson });

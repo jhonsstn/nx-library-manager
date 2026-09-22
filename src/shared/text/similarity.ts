@@ -1,13 +1,11 @@
 /**
- * Text similarity primitives kept pure so the ports of the Python matching
- * algorithms can be cross-checked against the originals in unit tests.
+ * Pure text-similarity primitives used by filename and metadata matching.
  */
 
 /**
  * Normalized Indel similarity in the range `[0, 1]`.
  *
- * Mirrors `rapidfuzz.fuzz.ratio`, which the Qt application uses for fuzzy update
- * title matching. rapidfuzz's `ratio` is LCS-based (`2 * lcs / (len(a) + len(b))`),
+ * LCS-based normalized Indel similarity (`2 * lcs / (len(a) + len(b))`),
  * which is not the same as normalized Levenshtein distance.
  */
 export function indelRatio(a: string, b: string): number {

@@ -2,7 +2,7 @@
   "name": "switch-game-catalog",
   "productName": "Switch Game Catalog",
   "version": "1.0.0-electron-beta.1",
-  "description": "Local desktop catalog for personal Nintendo Switch game files (Electron rewrite).",
+  "description": "Local desktop catalog for personal Nintendo Switch game files.",
   "author": {
     "name": "Switch Game Catalog contributors"
   },
@@ -33,6 +33,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4",
+    "semver": "^7.7.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -44,6 +45,7 @@
     "@types/node": "^26.6.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/semver": "^7.7.1",
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
     "cross-env": "^10.1.0",

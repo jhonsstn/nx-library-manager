@@ -75,7 +75,7 @@ export interface RecoveryDetails {
 }
 
 /**
- * Migration failure must not continue against a half-upgraded database (spec 10),
+ * Migration failure must not continue against a half-upgraded database,
  * so startup is replaced by a static recovery page when this happens.
  */
 export function createRecoveryWindow(details: RecoveryDetails): BrowserWindow {

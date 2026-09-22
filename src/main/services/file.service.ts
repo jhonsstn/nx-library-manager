@@ -1,5 +1,9 @@
-import { copyFileSync, existsSync, mkdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream, existsSync } from 'node:fs';
+import { mkdir, rename, rm, stat, unlink } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path';
+import { Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { DeleteFileResultDto } from '../../shared/contracts/results';
 import { appError } from '../../shared/errors/app-error';
 import { isShellPath } from '../../shared/format/install';
@@ -33,30 +37,112 @@ export function uniqueDestinationPath(folder: string, fileName: string): string 
  * the source untouched when it already lives there, and resolves collisions with
  * a numbered name. Shell/MTP destinations are handled by the MTP adapter.
  */
-export async function moveFileToFolder(sourcePath: string, folder: string): Promise<string> {
+export interface MoveFileOptions {
+  signal?: AbortSignal;
+  onProgress?: (transferredBytes: number) => void;
+  /** Test seam for exercising the streamed cross-volume path. */
+  renameFile?: typeof rename;
+  /** Test seam for source-removal failures after a streamed copy. */
+  unlinkSource?: typeof unlink;
+  /** Test seam for destination compensation failures. */
+  removeDestination?: (path: string) => Promise<void>;
+}
+
+export async function moveFileToFolder(
+  sourcePath: string,
+  folder: string,
+  options: MoveFileOptions = {},
+): Promise<string> {
   const targetRoot = resolve(folder);
-  mkdirSync(targetRoot, { recursive: true });
+  await mkdir(targetRoot, { recursive: true });
   const source = resolve(sourcePath);
   if (dirname(source) === targetRoot) return sourcePath;
   const destination = uniqueDestinationPath(targetRoot, basename(source));
+  const sourceSize = (await stat(source)).size;
+  options.signal?.throwIfAborted();
   try {
-    renameSync(source, destination);
+    await (options.renameFile ?? rename)(source, destination);
+    if (options.signal?.aborted) {
+      try {
+        await rename(destination, source);
+      } catch (cleanupError) {
+        throw appError('UNKNOWN_ERROR', 'The cancelled rename could not be moved back to its source path.', {
+          details: {
+            sourcePath: source,
+            destinationPath: destination,
+            cleanupError: describeError(cleanupError),
+          },
+          cause: cleanupError,
+        });
+      }
+      options.signal.throwIfAborted();
+    }
+    return destination;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
-    copyFileSync(source, destination);
-    unlinkSync(source);
   }
-  return destination;
+
+  const partial = join(targetRoot, `.${basename(destination)}.${randomUUID()}.partial`);
+  let transferredBytes = 0;
+  let finalized = false;
+  try {
+    const meter = new Transform({
+      transform(chunk: Buffer, _encoding, callback) {
+        transferredBytes += chunk.length;
+        options.onProgress?.(transferredBytes);
+        callback(null, chunk);
+      },
+    });
+    await pipeline(createReadStream(source), meter, createWriteStream(partial, { flags: 'wx' }), {
+      signal: options.signal,
+    });
+    const copiedSize = (await stat(partial)).size;
+    if (copiedSize !== sourceSize) {
+      throw appError('UNKNOWN_ERROR', `The copied file size did not match the source: ${source}`, {
+        details: { sourcePath: source, partialPath: partial, sourceSize, copiedSize },
+      });
+    }
+    options.signal?.throwIfAborted();
+    await rename(partial, destination);
+    finalized = true;
+    options.signal?.throwIfAborted();
+    try {
+      await (options.unlinkSource ?? unlink)(source);
+    } catch (sourceError) {
+      try {
+        if (options.removeDestination) await options.removeDestination(destination);
+        else await rm(destination, { force: true });
+        finalized = false;
+      } catch (cleanupError) {
+        finalized = false;
+        throw appError('UNKNOWN_ERROR', 'The source could not be removed and destination cleanup also failed.', {
+          details: {
+            sourcePath: source,
+            destinationPath: destination,
+            sourceError: describeError(sourceError),
+            cleanupError: describeError(cleanupError),
+          },
+          cause: sourceError,
+        });
+      }
+      throw sourceError;
+    }
+    return destination;
+  } catch (error) {
+    await rm(partial, { force: true }).catch(() => undefined);
+    if (finalized && existsSync(source)) await rm(destination, { force: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
 /** Ports `delete_file_if_present`. */
 export async function deleteFileIfPresent(filePath: string): Promise<boolean> {
   if (!existsSync(filePath)) return false;
-  unlinkSync(filePath);
+  await unlink(filePath);
   return true;
 }
 
-function prepareDestinationFolder(folder: string): string {
+async function prepareDestinationFolder(folder: string): Promise<string> {
   const value = String(folder ?? '').trim();
   if (!value || !isAbsolute(value) || isShellPath(value)) {
     throw appError('PATH_NOT_ALLOWED', `The destination folder must be an absolute path: ${value}`, {
@@ -64,7 +150,7 @@ function prepareDestinationFolder(folder: string): string {
     });
   }
   try {
-    mkdirSync(value, { recursive: true });
+    await mkdir(value, { recursive: true });
   } catch (error) {
     throw appError('PATH_NOT_ALLOWED', `The destination folder could not be created: ${value}`, {
       details: { path: value },
@@ -98,20 +184,22 @@ export class FileService {
     this.trash = options.trash;
   }
 
-  async deleteTrackedFile(input: { kind: 'game' | 'update'; id: number }): Promise<DeleteFileResultDto> {
-    return input.kind === 'update' ? this.deleteUpdate(input.id) : this.deleteGame(input.id);
+  async deleteTrackedFile(
+    input: { kind: 'game'; gameId: number } | { kind: 'update'; updateId: number },
+  ): Promise<DeleteFileResultDto> {
+    return input.kind === 'update' ? this.deleteUpdate(input.updateId) : this.deleteGame(input.gameId);
   }
 
-  async moveTrackedFile(input: {
-    kind: 'game' | 'update';
-    id: number;
-    destinationFolder: string;
-  }): Promise<FileOperationResultDto> {
+  async moveTrackedFile(
+    input:
+      | { kind: 'game'; gameId: number; destinationFolder: string }
+      | { kind: 'update'; updateId: number; destinationFolder: string },
+  ): Promise<FileOperationResultDto> {
     if (input.kind === 'update') {
-      const update = getUpdate(this.db, input.id);
-      if (!update) throw appError('NOT_FOUND', `No update or DLC file with id ${input.id}.`);
+      const update = getUpdate(this.db, input.updateId);
+      if (!update) throw appError('NOT_FOUND', `No update or DLC file with id ${input.updateId}.`);
       return this.moveTrackedRow({
-        id: input.id,
+        id: input.updateId,
         sourcePath: update.filePath,
         destinationFolder: input.destinationFolder,
         persist: (filePath, fileName, modifiedTime) =>
@@ -119,12 +207,12 @@ export class FileService {
       });
     }
 
-    const game = getGame(this.db, input.id);
-    if (!game) throw appError('NOT_FOUND', `No game with id ${input.id}.`);
+    const game = getGame(this.db, input.gameId);
+    if (!game) throw appError('NOT_FOUND', `No game with id ${input.gameId}.`);
     const baseFile = getBaseFile(this.db, game.id);
     if (!baseFile) throw appError('NOT_FOUND', `No base game file recorded for game ${game.id}.`);
     return this.moveTrackedRow({
-      id: input.id,
+      id: input.gameId,
       sourcePath: baseFile.filePath,
       destinationFolder: input.destinationFolder,
       persist: (filePath, fileName, modifiedTime) =>
@@ -152,8 +240,7 @@ export class FileService {
     const game = getGame(this.db, gameId);
     if (!game) throw appError('NOT_FOUND', `No game with id ${gameId}.`);
     let deletedFromDisk = false;
-    // Only base game files live on disk for a catalog entry; the Qt build
-    // removed exactly those and left update/DLC files alone.
+    // Only base game files are removed; update/DLC files remain independent.
     for (const file of listGameFiles(this.db, gameId)) {
       if (!file.isBaseGame) continue;
       if (await this.removeFromDisk(file.filePath)) deletedFromDisk = true;
@@ -175,10 +262,10 @@ export class FileService {
     destinationFolder: string;
     persist: (filePath: string, fileName: string, modifiedTime: number) => void;
   }): Promise<FileOperationResultDto> {
-    const folder = prepareDestinationFolder(input.destinationFolder);
+    const folder = await prepareDestinationFolder(input.destinationFolder);
     const sourcePath = input.sourcePath;
     const destinationPath = await moveFileToFolder(sourcePath, folder);
-    const modifiedTime = statSync(destinationPath).mtimeMs;
+    const modifiedTime = (await stat(destinationPath)).mtimeMs;
     try {
       withTransaction(this.db, () => {
         input.persist(destinationPath, basename(destinationPath), modifiedTime);
@@ -209,4 +296,8 @@ export class FileService {
     else await deleteFileIfPresent(filePath);
     return true;
   }
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message || error.name : String(error);
 }

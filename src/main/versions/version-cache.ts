@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import {
@@ -10,12 +11,7 @@ import type { AppErrorDto } from '../../shared/errors/codes';
 import { mergeVersionRecords, parseVersionsTxt } from './version-records';
 import type { VersionRecords } from './version-records';
 
-/**
- * TitleDB version cache. Ports `load_versions` / `_load_json_versions` /
- * `_load_txt_versions` from `switch_catalog/versions.py`: the cache survives
- * network failures, and a failing refresh only means the previous snapshot is
- * reused.
- */
+/** TitleDB version cache with atomic, validated refreshes. */
 export const VERSIONS_URL = TITLEDB_VERSIONS_URL;
 export const VERSIONS_TXT_URL = TITLEDB_VERSIONS_TXT_URL;
 
@@ -71,26 +67,35 @@ function errorMessage(error: unknown): string {
 interface RefreshOutcome {
   refreshed: boolean;
   error: AppErrorDto | null;
+  records: VersionRecords | null;
 }
 
-/** Downloads `url` into `file`; failures are reported, never thrown. */
+/** Downloads and validates `url`, then atomically replaces `file`. */
 async function refreshCacheFile(
   file: string,
   url: string,
   fetchImpl: typeof fetch,
+  parse: (text: string) => VersionRecords,
 ): Promise<RefreshOutcome> {
+  const partial = `${file}.${randomUUID()}.partial`;
   try {
     const response = await fetchImpl(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`);
     }
     const body = await response.text();
+    const records = parse(body);
+    const usableRecords = Object.values(records).some((versions) => Object.keys(versions).length > 0);
+    if (!usableRecords) throw new Error('download did not contain any valid title records');
     mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, body, 'utf8');
-    return { refreshed: true, error: null };
+    writeFileSync(partial, body, 'utf8');
+    renameSync(partial, file);
+    return { refreshed: true, error: null, records };
   } catch (error) {
+    rmSync(partial, { force: true });
     return {
       refreshed: false,
+      records: null,
       error: {
         code: 'NETWORK_ERROR',
         message: `Failed to refresh TitleDB version data from ${url}: ${errorMessage(error)}`,
@@ -102,7 +107,7 @@ async function refreshCacheFile(
 }
 
 /** Parses `versions.json`; anything unexpected degrades to no records. */
-function parseJsonVersions(text: string): VersionRecords {
+export function parseJsonVersions(text: string): VersionRecords {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -114,11 +119,14 @@ function parseJsonVersions(text: string): VersionRecords {
   const records: VersionRecords = {};
   for (const [titleId, entry] of Object.entries(parsed as Record<string, unknown>)) {
     if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) continue;
+    const normalizedTitleId = titleId.trim().toUpperCase();
+    if (!/^[0-9A-F]{16}$/.test(normalizedTitleId)) continue;
     const titleRecords: Record<string, string> = {};
     for (const [version, releaseDate] of Object.entries(entry as Record<string, unknown>)) {
+      if (!/^\d+$/.test(version)) continue;
       titleRecords[version] = typeof releaseDate === 'string' ? releaseDate : '';
     }
-    records[titleId] = titleRecords;
+    if (Object.keys(titleRecords).length > 0) records[normalizedTitleId] = titleRecords;
   }
   return records;
 }
@@ -147,13 +155,21 @@ async function loadSource(options: {
   parse: (text: string) => VersionRecords;
 }): Promise<SourceOutcome> {
   const outcome = options.mustRefresh
-    ? await refreshCacheFile(options.file, options.url, options.fetchImpl)
-    : { refreshed: false, error: null };
+    ? await refreshCacheFile(options.file, options.url, options.fetchImpl, options.parse)
+    : { refreshed: false, error: null, records: null };
   return {
-    records: readCacheFile(options.file, options.parse),
+    records: outcome.records ?? readCacheFile(options.file, options.parse),
     refreshed: outcome.refreshed,
     error: outcome.error,
   };
+}
+
+/** Reads existing cache synchronously so startup can render immediately. */
+export function readCachedVersionRecords(paths: VersionCachePaths): VersionRecords {
+  return mergeVersionRecords(
+    readCacheFile(paths.versionsJsonFile, parseJsonVersions),
+    readCacheFile(paths.versionsTxtFile, parseVersionsTxt),
+  );
 }
 
 /**

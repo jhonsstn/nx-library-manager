@@ -147,7 +147,7 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
   const deleteSelectedUpdates = async (ids: number[]) => {
     setDeleteIds(null);
     try {
-      for (const id of ids) await deleteFile.mutateAsync({ kind: 'update', id });
+      for (const updateId of ids) await deleteFile.mutateAsync({ kind: 'update', updateId });
       toast.success('Update files deleted', `${ids.length} file(s) removed from disk`);
     } catch (error) {
       toast.error('Could not delete every update file', errorMessage(error));

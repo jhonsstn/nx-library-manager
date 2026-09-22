@@ -1,6 +1,13 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import { toAppErrorDto } from '../../shared/errors/app-error';
 import type { IpcResult } from '../../shared/contracts/ipc';
+import { appError } from '../../shared/errors/app-error';
+
+let acceptingInvocations = true;
+
+export function rejectNewIpcWork(): void {
+  acceptingInvocations = false;
+}
 
 function isZodError(value: unknown): value is { issues: Array<{ path?: Array<string | number>; message: string }> } {
   if (typeof value !== 'object' || value === null) return false;
@@ -28,6 +35,9 @@ export function handle<TArgs extends unknown[], TResult>(
 ): void {
   ipcMain.handle(channel, async (_event, ...args: unknown[]): Promise<IpcResult<TResult>> => {
     try {
+      if (!acceptingInvocations) {
+        throw appError('JOB_CANCELLED', 'The application is shutting down and cannot start new work.');
+      }
       const parsed = parser.parse(args);
       const value = await handler(...parsed);
       return { ok: true, value };

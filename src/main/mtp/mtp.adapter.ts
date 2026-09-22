@@ -1,10 +1,10 @@
 import type { AppErrorDto } from '../../shared/errors/codes';
 
 /**
- * Platform-neutral MTP boundary (`migration-spec/platform/14-windows-mtp.md`).
+ * Platform-neutral MTP boundary (`docs/platform/14-windows-mtp.md`).
  *
  * No renderer or catalog service may shell out to PowerShell directly; the only
- * implementation shipped in the first migration release is the PowerShell
+ * current implementation is the PowerShell
  * adapter, and a future WPD/native adapter must be swappable without touching
  * services or React code.
  */

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { SwitchCatalogError } from '@shared/errors/app-error';
 import { displayFolder, isShellPath } from '@shared/format/install';
 import type { AppUpdateStatusDto } from '@shared/types/domain';
@@ -12,12 +11,10 @@ import { ConfirmDialog } from '@renderer/components/Modal';
 import { useToast } from '@renderer/components/Toast';
 import { InstallQueueTray } from '@renderer/features/install/InstallQueueTray';
 import { DbiServerPanel } from '@renderer/features/settings/DbiServerPanel';
-import { catalogKeysToInvalidate, queryKeys } from '@renderer/query/keys';
 import {
   useAppVersion,
   useExportBackup,
   useFileMutations,
-  useLegacyDataInfo,
   useMtpStatus,
   useResetLibrary,
   useServerMutations,
@@ -84,11 +81,9 @@ export function SettingsForm() {
   const { refreshMtp } = useServerMutations();
   const mtp = useMtpStatus();
   const version = useAppVersion();
-  const legacy = useLegacyDataInfo();
   const exportBackup = useExportBackup();
   const resetLibrary = useResetLibrary();
   const toast = useToast();
-  const queryClient = useQueryClient();
 
   const [draft, setDraft] = useState<SettingsDraft | null>(null);
   const [igdbSecret, setIgdbSecret] = useState('');
@@ -97,7 +92,6 @@ export function SettingsForm() {
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatusDto | null>(null);
   const [updateCheckError, setUpdateCheckError] = useState<unknown>(null);
   const [checking, setChecking] = useState(false);
-  const [legacyBusy, setLegacyBusy] = useState(false);
 
   const stored = settings.data ?? null;
 
@@ -196,29 +190,6 @@ export function SettingsForm() {
       toast.error('Update check failed', messageOf(error));
     } finally {
       setChecking(false);
-    }
-  };
-
-  const runLegacyAction = async (action: 'import' | 'skip') => {
-    setLegacyBusy(true);
-    try {
-      const next =
-        action === 'import'
-          ? await getCatalogApi().app.importLegacyData()
-          : await getCatalogApi().app.skipLegacyImport();
-      queryClient.setQueryData(queryKeys.settings(), next);
-      setDraft(null);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.legacyDataInfo() });
-      for (const key of catalogKeysToInvalidate()) await queryClient.invalidateQueries({ queryKey: key });
-      if (action === 'import') {
-        toast.success('Existing data imported', 'The original Switch Game Catalog files were left untouched.');
-      } else {
-        toast.info('Starting fresh', 'Existing data was left where it is.');
-      }
-    } catch (error) {
-      toast.error(action === 'import' ? 'Import failed' : 'Could not skip the import', messageOf(error));
-    } finally {
-      setLegacyBusy(false);
     }
   };
 
@@ -416,44 +387,6 @@ export function SettingsForm() {
         </div>
         <ErrorText error={exportBackup.error} />
         <ErrorText error={resetLibrary.error} />
-      </section>
-
-      <section className="panel">
-        <h2 className="panel__title">Migration / diagnostics</h2>
-        {legacy.data?.found ? (
-          <>
-            <p>
-              Existing Switch Game Catalog data found in <span className="mono">{legacy.data.sourceDirectory}</span>
-            </p>
-            <ul className="list">
-              <li className="list__item list__item--static">
-                <span className="list__title">Games</span>
-                <span>{legacy.data.games}</span>
-              </li>
-              <li className="list__item list__item--static">
-                <span className="list__title">Updates/DLC</span>
-                <span>{legacy.data.updates}</span>
-              </li>
-              <li className="list__item list__item--static">
-                <span className="list__title">Favorites</span>
-                <span>{legacy.data.favorites}</span>
-              </li>
-            </ul>
-            <div className="row row--wrap">
-              <Button onClick={() => void runLegacyAction('import')} disabled={legacyBusy}>
-                Import existing data
-              </Button>
-              <Button onClick={() => void runLegacyAction('skip')} disabled={legacyBusy}>
-                Start fresh
-              </Button>
-            </div>
-            <p className="dim">Importing copies the old database and settings; the original files stay untouched.</p>
-          </>
-        ) : (
-          <p className="dim">No existing Switch Game Catalog data was found next to this installation.</p>
-        )}
-        <ErrorText error={legacy.error} />
-        <p className="dim">Application version: v{version.data ?? '—'}</p>
       </section>
 
       <div className="settings-form__actions">

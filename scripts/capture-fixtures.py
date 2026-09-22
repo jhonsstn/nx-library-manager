@@ -285,7 +285,11 @@ def extract_pure_helpers(ui_path: Path, names: list[str], namespace: dict[str, A
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--python-root", default=str(Path(__file__).resolve().parents[2]))
+    parser.add_argument(
+        "--python-root",
+        default=str(Path(__file__).resolve().parents[1] / "python-app"),
+        help="Directory containing the Qt application's switch_catalog package.",
+    )
     parser.add_argument(
         "--out",
         default=str(Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "legacy" / "behavior.json"),

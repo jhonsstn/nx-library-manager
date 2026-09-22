@@ -1,0 +1,51 @@
+appId: com.switchgamecatalog.app
+productName: Switch Game Catalog
+copyright: Switch Game Catalog contributors
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - dist/**/*
+  - package.json
+  - '!**/*.map'
+
+extraResources:
+  - from: resources/scripts
+    to: scripts
+  - from: resources/icon.png
+    to: icon.png
+
+asarUnpack:
+  - '**/*.node'
+
+# better-sqlite3 is a native module and must be rebuilt against the Electron ABI.
+npmRebuild: true
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  icon: resources/icon.ico
+  # Per-user install is the default for NSIS; no admin prompt required.
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Switch Game Catalog
+  deleteAppDataOnUninstall: false
+  artifactName: ${productName}-${version}-setup.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+publish: null

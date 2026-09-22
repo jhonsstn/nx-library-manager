@@ -1,0 +1,213 @@
+/* Library / grid / details styles (cluster A).
+   Complements the shared vocabulary in `global.css`: only what the Library,
+   Grid, Favorites and game-details surfaces add on top of it. */
+
+/* ---------- Library ---------- */
+
+.pane-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.library-filters {
+  flex: none;
+}
+
+.library-filters__search {
+  flex: 3 1 200px;
+  width: auto;
+  min-width: 160px;
+}
+
+.library-filters__genre {
+  flex: 1 1 140px;
+  width: auto;
+  min-width: 120px;
+}
+
+.library-filters__progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.library-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.library-row {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.library-row__badges {
+  display: flex;
+  flex: none;
+  gap: var(--space-1);
+}
+
+.library-skeletons {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ---------- Grid ---------- */
+
+.grid-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.grid-virtual {
+  position: relative;
+  width: 100%;
+}
+
+.grid__row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+}
+
+.grid-toolbar__range {
+  flex: 1 1 220px;
+  max-width: 360px;
+  width: auto;
+}
+
+.grid-toolbar__size {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  min-width: 56px;
+}
+
+.grid__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.grid__art--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--border);
+}
+
+/* ---------- Details ---------- */
+
+.details__trailer {
+  margin-bottom: var(--space-2);
+}
+
+.details__description {
+  display: block;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.details__section-title {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--font-size);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.updates-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 220px;
+  overflow: auto;
+  margin-bottom: var(--space-3);
+  background: var(--bg-panel);
+}
+
+.updates-list__item {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.updates-list__empty {
+  padding: var(--space-3);
+}
+
+.install-summary {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-2);
+}
+
+/* ---------- Screenshot viewer / trailer ---------- */
+
+.screenshot-thumb {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  cursor: zoom-in;
+}
+
+.screenshot-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.screenshot-thumb:focus-visible {
+  border-color: var(--accent);
+}
+
+.screenshot-viewer {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.screenshot-viewer img {
+  width: 100%;
+  max-height: 65vh;
+  object-fit: contain;
+  background: var(--bg-panel);
+  border-radius: var(--radius);
+}
+
+.trailer-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #000;
+}

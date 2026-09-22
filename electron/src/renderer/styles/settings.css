@@ -1,0 +1,245 @@
+/* Cluster B stylesheet: Unmatched, Settings, install queue, metadata dialogs.
+   Only classes the shared vocabulary in global.css does not already provide. */
+
+/* ---------- Unmatched updates ---------- */
+
+.unmatched__title {
+  font-size: var(--font-size-lg);
+  margin: 0;
+}
+
+.unmatched__game-select {
+  width: auto;
+  min-width: 220px;
+  flex: 1 1 220px;
+  max-width: 420px;
+}
+
+.unmatched__tray {
+  flex: 0 0 auto;
+  max-height: 40%;
+  overflow: auto;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.unmatched__tray:empty {
+  padding: 0;
+}
+
+.unmatched-list__header {
+  gap: var(--space-3);
+  font-size: var(--font-size-sm);
+  cursor: default;
+}
+
+.unmatched-list__row {
+  align-items: flex-start;
+}
+
+.unmatched-list__main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.unmatched-list__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unmatched-list__path {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Install ---------- */
+
+.install-plan {
+  max-height: 40vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.install-plan__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.install-plan__item:last-child {
+  border-bottom: 0;
+}
+
+.install-plan__name {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.install-plan__path {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.install-plan__total {
+  margin: var(--space-3) 0;
+  color: var(--text-muted);
+}
+
+.install-warning {
+  color: var(--warning);
+  font-size: var(--font-size-sm);
+  white-space: pre-line;
+}
+
+.install-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.install-controls__actions {
+  flex-wrap: wrap;
+}
+
+.install-tray {
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+
+.install-tray__title {
+  font-size: var(--font-size);
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.install-tray__row {
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.install-tray__body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.install-tray__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* ---------- Settings ---------- */
+
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-page__title {
+  font-size: var(--font-size-xl);
+  margin: 0;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-form__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.dbi-server__url {
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  flex-wrap: wrap;
+}
+
+/* ---------- Metadata ---------- */
+
+.metadata-search {
+  margin-bottom: var(--space-3);
+}
+
+.metadata-candidates {
+  max-height: 45vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.metadata-candidate {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.metadata-candidate:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.metadata-candidate:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.metadata-candidate__cover {
+  width: 54px;
+  height: 72px;
+  flex: 0 0 auto;
+  font-size: var(--font-size-sm);
+}
+
+.metadata-candidate__body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.metadata-candidate__title {
+  font-weight: 600;
+}

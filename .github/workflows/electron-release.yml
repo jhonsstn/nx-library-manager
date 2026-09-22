@@ -1,0 +1,68 @@
+name: Electron build
+
+# Packaging pipeline from migration-spec/platform/15-packaging-and-updates.md.
+# E2E (Playwright + Electron) is intentionally not run here: it needs a real
+# display and an interactive Windows session, so it stays a local/manual gate.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+defaults:
+  run:
+    working-directory: electron
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Build renderer, main and preload
+        run: npm run build
+
+      # better-sqlite3 must match the Electron ABI, which `npm run package:win`
+      # handles through electron-builder's npmRebuild step.
+      - name: Package Windows installer and portable build
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem release -File |
+            Where-Object { $_.Name -match '\.(exe|zip)$' } |
+            ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash + '  ' + $_.Name } |
+            Set-Content release/SHA256SUMS.txt
+
+      - name: Attach artifacts to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            electron/release/*.exe
+            electron/release/SHA256SUMS.txt
+
+      - name: Upload build artifacts
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: switch-game-catalog-windows
+          path: |
+            electron/release/*.exe
+            electron/release/SHA256SUMS.txt

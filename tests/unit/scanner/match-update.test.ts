@@ -10,7 +10,7 @@ import {
   type MatchCandidateGame,
 } from '@main/scanner/match-update';
 
-/** Built the way `scripts/capture-fixtures.py` builds the rows it feeds the matcher. */
+/** Rows shaped like the ones behind the captured legacy match results. */
 function buildGames(gameFileNames: string[]): MatchCandidateGame[] {
   return gameFileNames.map((fileName, index) => {
     const title = cleanTitle(fileName);

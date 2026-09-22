@@ -22,7 +22,6 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
     "verify": "npm run typecheck && npm test && npm run build",
-    "fixtures:capture": "python3 scripts/capture-fixtures.py",
     "package:win": "electron-builder --win --x64",
     "package:dir": "electron-builder --dir"
   },

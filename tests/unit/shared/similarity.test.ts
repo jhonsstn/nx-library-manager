@@ -6,7 +6,7 @@ const fuzzRatio = fixture.metadata.fuzzRatio;
 const sequenceRatio = fixture.metadata.sequenceMatcherRatio;
 
 if (!fuzzRatio) {
-  throw new Error('Fixture was captured without rapidfuzz; re-run scripts/capture-fixtures.py.');
+  throw new Error('The legacy behaviour fixture is missing its fuzzy-ratio samples.');
 }
 
 function pairs(source: Record<string, number>): Array<[string, string, number]> {

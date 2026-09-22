@@ -14,8 +14,8 @@ import type { VersionInfoDto } from '@shared/types/domain';
 import fixture from '../../fixtures/legacy/behavior.json';
 
 /**
- * Mirrors `scripts/capture-fixtures.py` so these inputs line up with the
- * captured legacy outputs in `behavior.json`.
+ * Same shape as the sample recorded in the legacy fixture, so these inputs line
+ * up with the expected outputs in `behavior.json`.
  */
 const VERSIONS_TXT_SAMPLE = [
   'id|name|version',

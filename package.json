@@ -16,7 +16,7 @@
     "build:preload": "node scripts/build-preload.mjs",
     "build:renderer": "vite build",
     "build": "pnpm run build:main && pnpm run build:preload && pnpm run build:renderer",
-    "dev": "pnpm run build:main && pnpm run build:preload && concurrently -k -n vite,main,electron -c cyan,magenta,yellow \"vite\" \"tsc -p tsconfig.main.json -w --preserveWatchOutput\" \"wait-on tcp:127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "dev": "pnpm run build:main && pnpm run build:preload && concurrently -k -n vite,main,electron -c cyan,magenta,yellow \"vite\" \"tsc -p tsconfig.main.json -w --preserveWatchOutput\" \"wait-on tcp:127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
     "start": "electron .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
     "test": "vitest run",

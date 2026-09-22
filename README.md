@@ -16,6 +16,10 @@ pnpm install --frozen-lockfile
 pnpm run dev
 ```
 
+`pnpm run dev` starts Vite and opens the Electron app window automatically. Use that
+window for testing; opening the Vite URL in a regular browser cannot access the
+Electron preload bridge.
+
 Useful commands:
 
 ```sh

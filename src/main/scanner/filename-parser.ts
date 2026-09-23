@@ -149,6 +149,23 @@ export function extractTitleId(fileName: string): string {
   return match ? match[0].toUpperCase() : '';
 }
 
+/** A descriptive `[DLC ...]` group can name a locally verified DLC when metadata has no name. */
+export function dlcNameFromFilename(fileName: string): string | null {
+  const stem = pathStem(fileName);
+  const marker = /\[DLC(?:\s+|\s*[:–-]\s*)/i.exec(stem);
+  if (!marker) return null;
+  let depth = 1;
+  const start = marker.index + marker[0].length;
+  for (let index = start; index < stem.length; index += 1) {
+    if (stem[index] === '[') depth += 1;
+    if (stem[index] === ']') depth -= 1;
+    if (depth !== 0) continue;
+    const name = collapseWhitespace(stem.slice(start, index).replace(/^[:–-]\s*/, ''));
+    return name && name.length <= 160 && !TITLE_ID_RE.test(name) ? name : null;
+  }
+  return null;
+}
+
 /** `title_id_family`: the leading 12 characters that identify a game's title-ID group. */
 export function titleIdFamily(fileName: string): string {
   const titleId = extractTitleId(fileName);

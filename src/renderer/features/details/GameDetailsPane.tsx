@@ -285,13 +285,17 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
           </div>
           <ul className="details__dlc-list">{knownDlc.map((item) => (
             <li className="details__dlc-row" key={item.titleId}>
-              <span className="details__dlc-name">{item.name}<small>{item.titleId}</small></span>
+              <span className="details__dlc-name">{item.name}<small>
+                {item.nameSource === 'title-id' ? 'Name unavailable' : `${item.titleId} · ${
+                  item.nameSource === 'filename' ? 'Filename' : item.nameSource === 'package'
+                    ? 'Package metadata' : 'TitleDB'}`}
+              </small></span>
               <span className={`badge ${item.filePresent ? 'badge--ok' : 'badge--update'}`}>
                 {item.filePresent ? 'File present' : 'File missing'}
               </span>
             </li>
           ))}</ul>
-          <p className="details__source-note">TitleDB · updated {details.knownDlcRefreshedAt?.slice(0, 10) ?? 'unknown date'} · file status refers to this library</p>
+          <p className="details__source-note">DLC IDs: TitleDB · updated {details.knownDlcRefreshedAt?.slice(0, 10) ?? 'unknown date'} · file status refers to this library</p>
         </div> : null}
         <div className="details__subheading details__subheading--local">
           <h4>Local files</h4>

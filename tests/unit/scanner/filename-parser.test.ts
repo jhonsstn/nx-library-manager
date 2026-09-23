@@ -3,6 +3,7 @@ import { classifyGameFile, updateFileGroup } from '@main/scanner/classify-file';
 import {
   cleanTitle,
   detectVersion,
+  dlcNameFromFilename,
   extractTitleId,
   parseSwitchFilename,
   titleIdFamily,
@@ -53,6 +54,20 @@ describe('extractTitleId', () => {
     expect(extractTitleId('0100ABCDEF1234567.nsp')).toBe('');
     expect(extractTitleId('0100ABCDEF12345G.nsp')).toBe('');
     expect(titleIdFamily('Hades.nsp')).toBe('');
+  });
+});
+
+describe('dlcNameFromFilename', () => {
+  it('extracts descriptive DLC brackets while normalizing whitespace', () => {
+    expect(dlcNameFromFilename('Monster Hunter Stories 2 [DLC Enas Outfits Cheerleader Three-Pack  Blue Orange Pink] [0100E21011447007][v0].nsp'))
+      .toBe('Enas Outfits Cheerleader Three-Pack Blue Orange Pink');
+    expect(dlcNameFromFilename('Game [DLC: Hero Costume] [0100AABBCCDD1001].nsp'))
+      .toBe('Hero Costume');
+  });
+
+  it('does not invent a name from a marker without a description', () => {
+    expect(dlcNameFromFilename('Game [DLC] [0100AABBCCDD1001].nsp')).toBeNull();
+    expect(dlcNameFromFilename('Game [0100AABBCCDD1001].nsp')).toBeNull();
   });
 });
 

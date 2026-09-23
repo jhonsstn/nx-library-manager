@@ -197,8 +197,9 @@ describe('GameDetailsPane', () => {
           provisional: false, inspectionError: null,
         }],
         knownDlc: [
-          { titleId: '0100AABBCCDD1001', name: 'Present pack', filePresent: true },
-          { titleId: '0100AABBCCDD1002', name: 'Missing pack', filePresent: false },
+          { titleId: '0100AABBCCDD1001', name: 'Present pack', nameSource: 'filename', filePresent: true },
+          { titleId: '0100AABBCCDD1002', name: 'Missing pack', nameSource: 'titledb', filePresent: false },
+          { titleId: '0100AABBCCDD1003', name: '0100AABBCCDD1003', nameSource: 'title-id', filePresent: false },
         ],
         knownDlcRefreshedAt: '2026-09-23T00:00:00Z',
         versionStatus: {
@@ -212,9 +213,11 @@ describe('GameDetailsPane', () => {
 
     expect(await screen.findByText('Update file missing')).toBeVisible();
     expect(screen.getByText(/Missing v131072 .* TitleDB/)).toBeVisible();
-    expect(screen.getByText('2 listed · 1 file missing')).toBeVisible();
+    expect(screen.getByText('3 listed · 2 files missing')).toBeVisible();
     expect(screen.getByText('Missing pack')).toBeVisible();
     expect(screen.getByText('Present pack')).toBeVisible();
+    expect(screen.getByText('0100AABBCCDD1001 · Filename')).toBeVisible();
+    expect(screen.getByText('Name unavailable')).toBeVisible();
     expect(screen.getByText('Verified cnmt · D:\\games\\Zelda.nsp')).not.toBeVisible();
   });
 

@@ -185,7 +185,43 @@ describe('CatalogService.getGame', () => {
     expect(details.knownDlc?.find((entry) => entry.titleId === '0100000000011000'))
       .toMatchObject({ name:'Bonus content',filePresent:true });
     expect(details.knownDlc?.find((entry) => entry.titleId === '0100000000011001'))
-      .toMatchObject({ filePresent:false });
+      .toMatchObject({ name:'0100000000011001',nameSource:'title-id',filePresent:false });
+  });
+
+  it('uses a matching local DLC filename when TitleDB has no name', () => {
+    const name = 'Zelda [DLC Hero Costume] [0100000000011001][v0].nsp';
+    recordInspection(db, {
+      path: `C:/updates/${name}`, size: 100, mtime: 5000, parserVersion: 1,
+      keysRevision: 1, error: null,
+      titles: [{ titleId: '0100000000011001', baseTitleId: TITLE_ID,
+        type: 'dlc', rawVersion: 0, name: null, publisher: null, source: 'cnmt' }],
+    });
+    expect(catalog.getGame(2).knownDlc?.find((entry) => entry.titleId === '0100000000011001'))
+      .toMatchObject({ name: 'Hero Costume', nameSource: 'filename', filePresent: true });
+    expect(catalog.getGame(2).knownDlc?.find((entry) => entry.titleId === '0100000000011000'))
+      .toMatchObject({ name: 'Bonus content', nameSource: 'titledb' });
+  });
+
+  it('prefers a specific package name over a filename and rejects a conflicting filename ID', () => {
+    const wrongFile = 'Zelda [DLC Wrong Costume] [0100000000011002][v0].nsp';
+    recordInspection(db, {
+      path: `C:/updates/${wrongFile}`, size: 100, mtime: 5000, parserVersion: 1,
+      keysRevision: 1, error: null,
+      titles: [{ titleId: '0100000000011001', baseTitleId: TITLE_ID,
+        type: 'dlc', rawVersion: 0, name: null, publisher: null, source: 'cnmt' }],
+    });
+    expect(catalog.getGame(2).knownDlc?.find((entry) => entry.titleId === '0100000000011001'))
+      .toMatchObject({ name: '0100000000011001', nameSource: 'title-id', filePresent: true });
+
+    const namedFile = 'Zelda [DLC Filename Costume] [0100000000011001][v0].nsp';
+    recordInspection(db, {
+      path: `C:/updates/${namedFile}`, size: 100, mtime: 5001, parserVersion: 1,
+      keysRevision: 1, error: null,
+      titles: [{ titleId: '0100000000011001', baseTitleId: TITLE_ID,
+        type: 'dlc', rawVersion: 0, name: 'Package Costume', publisher: null, source: 'cnmt' }],
+    });
+    expect(catalog.getGame(2).knownDlc?.find((entry) => entry.titleId === '0100000000011001'))
+      .toMatchObject({ name: 'Package Costume', nameSource: 'package', filePresent: true });
   });
 
   it('rejects unknown game ids with NOT_FOUND', () => {

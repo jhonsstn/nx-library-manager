@@ -112,6 +112,7 @@ export interface ContainedTitleDto {
 export interface KnownDlcDto {
   titleId: string;
   name: string;
+  nameSource: 'titledb' | 'package' | 'filename' | 'title-id';
   filePresent: boolean;
 }
 

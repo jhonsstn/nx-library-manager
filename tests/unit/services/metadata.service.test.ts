@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { TEMP_ROOT } from '../../setup/vitest.setup';
 import { closeDatabase, openDatabase, type AppDatabase } from '../../../src/main/db/database';
 import { runMigrations } from '../../../src/main/db/migrations';
@@ -256,7 +256,7 @@ describe('MetadataService', () => {
         needsReview: false,
         metadataLocked: false,
       });
-      expect(game?.coverImagePath?.startsWith(`${paths.coversCacheDir}/`)).toBe(true);
+      expect(game?.coverImagePath?.startsWith(`${paths.coversCacheDir}${sep}`)).toBe(true);
       expect(existsSync(game?.coverImagePath ?? '')).toBe(true);
     });
   });
@@ -285,14 +285,14 @@ describe('MetadataService', () => {
         needsReview: false,
       });
       const coverPath = getGame(db, gameId)?.coverImagePath ?? '';
-      expect(coverPath.startsWith(`${paths.coversCacheDir}/`)).toBe(true);
+      expect(coverPath.startsWith(`${paths.coversCacheDir}${sep}`)).toBe(true);
       expect(existsSync(coverPath)).toBe(true);
 
       const rows = listScreenshots(db, gameId);
       expect(rows.map((row) => row.image_url)).toEqual(screenshots);
       const cached = rows.filter((row) => row.local_path);
       expect(cached).toHaveLength(8);
-      expect(cached.every((row) => row.local_path?.startsWith(`${paths.screenshotsCacheDir}/`))).toBe(true);
+      expect(cached.every((row) => row.local_path?.startsWith(`${paths.screenshotsCacheDir}${sep}`))).toBe(true);
       expect(cached.every((row) => existsSync(row.local_path ?? ''))).toBe(true);
       expect(rows.slice(8).every((row) => row.local_path === null)).toBe(true);
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { join, resolve } from 'node:path';
 import {
   catalogImageUrl,
   displayImageUrl,
@@ -6,13 +7,13 @@ import {
 } from '@main/platform/catalog-image';
 
 const roots = {
-  coversCacheDir: '/userData/cache/covers',
-  screenshotsCacheDir: '/userData/cache/screenshots',
+  coversCacheDir: resolve('/userData/cache/covers'),
+  screenshotsCacheDir: resolve('/userData/cache/screenshots'),
 };
 
 describe('catalogImageUrl / displayImageUrl', () => {
   it('prefers the cached copy and falls back to the origin URL', () => {
-    expect(displayImageUrl('/userData/cache/covers/abc.jpg', 'https://images.igdb.com/x.jpg', 'covers')).toBe(
+    expect(displayImageUrl(join(roots.coversCacheDir, 'abc.jpg'), 'https://images.igdb.com/x.jpg', 'covers')).toBe(
       'catalog-image://covers/abc.jpg',
     );
     expect(displayImageUrl(null, 'https://images.igdb.com/x.jpg', 'covers')).toBe('https://images.igdb.com/x.jpg');
@@ -21,15 +22,15 @@ describe('catalogImageUrl / displayImageUrl', () => {
 
   it('encodes file names so spaces and unicode survive the round trip', () => {
     const url = catalogImageUrl('screenshots', 'Spi el ünique.jpg');
-    expect(resolveCatalogImageRequest(url, roots)).toBe('/userData/cache/screenshots/Spi el ünique.jpg');
+    expect(resolveCatalogImageRequest(url, roots)).toBe(join(roots.screenshotsCacheDir, 'Spi el ünique.jpg'));
   });
 });
 
 describe('resolveCatalogImageRequest', () => {
   it('maps each cache kind to its own directory', () => {
-    expect(resolveCatalogImageRequest('catalog-image://covers/a.jpg', roots)).toBe('/userData/cache/covers/a.jpg');
+    expect(resolveCatalogImageRequest('catalog-image://covers/a.jpg', roots)).toBe(join(roots.coversCacheDir, 'a.jpg'));
     expect(resolveCatalogImageRequest('catalog-image://screenshots/b.png', roots)).toBe(
-      '/userData/cache/screenshots/b.png',
+      join(roots.screenshotsCacheDir, 'b.png'),
     );
   });
 

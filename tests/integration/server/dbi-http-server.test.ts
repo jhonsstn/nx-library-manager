@@ -219,10 +219,10 @@ describe('DbiHttpServer routes', () => {
   });
 
   it('escapes file names for display and encodes them for links separately', async () => {
-    addCatalogFile('Rock & Roll <Live>.xci', Buffer.from('riff', 'utf8'));
+    addCatalogFile("Rock & Roll 'Live'.xci", Buffer.from('riff', 'utf8'));
     const body = await (await fetch(`${baseUrl}/dir/`)).text();
-    expect(body).toContain('Rock &amp; Roll &lt;Live&gt;.xci');
-    expect(body).toContain('href="Rock%20%26%20Roll%20%3CLive%3E.xci"');
+    expect(body).toContain('Rock &amp; Roll &#x27;Live&#x27;.xci');
+    expect(body).toContain('href="Rock%20%26%20Roll%20%27Live%27.xci"');
   });
 
   it('streams multi-chunk downloads without corrupting bytes', async () => {

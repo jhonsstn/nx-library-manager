@@ -27,7 +27,7 @@ export function App() {
     <SelectionProvider>
       <div className="app-shell">
         <nav className="sidebar" aria-label="Sections">
-          <div className="sidebar__brand">Switch Game Catalog</div>
+          <div className="sidebar__brand">NX Library Manager</div>
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}

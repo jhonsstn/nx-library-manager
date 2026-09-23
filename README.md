@@ -1,6 +1,6 @@
-# Switch Game Catalog
+# NX Library Manager
 
-Switch Game Catalog is a standalone Electron desktop app for cataloging personal Nintendo Switch package files, enriching entries with IGDB metadata, tracking available versions, and moving or serving files for installation.
+NX Library Manager is a standalone Electron desktop app for cataloging personal Nintendo Switch package files, enriching entries with IGDB metadata, tracking available versions, and moving or serving files for installation.
 
 It is a portable application with its own database, settings, and caches beside the executable. It does **not** import, migrate, read, or share data with the earlier Python application.
 

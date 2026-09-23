@@ -112,7 +112,7 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 function bootstrap(): void {
-  app.setAppUserModelId('com.switchgamecatalog.app');
+  app.setAppUserModelId('com.nxlibrarymanager.app');
 
   const paths = resolveAppPaths(app.getPath('userData'), appRoot);
   ensureAppPaths(paths);

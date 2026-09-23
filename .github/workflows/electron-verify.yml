@@ -37,5 +37,5 @@ jobs:
       - name: Smoke test packaged app
         shell: pwsh
         run: |
-          & 'release/win-unpacked/Switch Game Catalog.exe' --smoke-test
+          & 'release/win-unpacked/NX Library Manager.exe' --smoke-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

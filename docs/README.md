@@ -1,4 +1,4 @@
-# Switch Game Catalog documentation
+# NX Library Manager documentation
 
 These documents describe the standalone Electron application: its process boundaries, catalog scanner, metadata integration, install queue, DBI server, Windows MTP support, packaging, and tests.
 

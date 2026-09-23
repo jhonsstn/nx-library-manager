@@ -26,7 +26,7 @@ export class ShutdownCoordinator {
       this.options.onStatus?.({ phase: 'waiting', message: this.options.waitingMessage() });
       this.work = this.options.shutdown().finally(() => {
         this.phase = 'complete';
-        this.options.onStatus?.({ phase: 'closing', message: 'Closing Switch Game Catalog…' });
+        this.options.onStatus?.({ phase: 'closing', message: 'Closing NX Library Manager…' });
         this.options.quit();
       });
     }

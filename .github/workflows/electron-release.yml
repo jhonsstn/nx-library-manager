@@ -46,7 +46,7 @@ jobs:
       - name: Smoke test packaged app
         shell: pwsh
         run: |
-          & 'release/win-unpacked/Switch Game Catalog.exe' --smoke-test
+          & 'release/win-unpacked/NX Library Manager.exe' --smoke-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Smoke test portable executable
@@ -77,7 +77,7 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         uses: actions/upload-artifact@v4
         with:
-          name: switch-game-catalog-windows
+          name: nx-library-manager-windows
           path: |
             release/*-portable.exe
             release/SHA256SUMS.txt

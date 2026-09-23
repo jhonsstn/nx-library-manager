@@ -69,8 +69,8 @@ describe('isNewerVersion', () => {
 
 describe('AppUpdateService.checkLatestRelease', () => {
   it('checks releases from this repository', () => {
-    expect(RELEASES_API_URL).toBe('https://api.github.com/repos/jhonsstn/switch-game-catalog/releases/latest');
-    expect(RELEASES_PAGE_URL).toBe('https://github.com/jhonsstn/switch-game-catalog/releases');
+    expect(RELEASES_API_URL).toBe('https://api.github.com/repos/jhonsstn/nx-library-manager/releases/latest');
+    expect(RELEASES_PAGE_URL).toBe('https://github.com/jhonsstn/nx-library-manager/releases');
   });
 
   it('reports a newer release', async () => {

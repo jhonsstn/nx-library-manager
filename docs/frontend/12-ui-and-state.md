@@ -15,7 +15,7 @@ Use a persistent app shell/sidebar rather than separate native tabs.
 
 ```text
 ┌───────────────────────────────────────────────────────────────┐
-│ Switch Game Catalog                             status/actions │
+│ NX Library Manager                             status/actions │
 ├──────────────┬────────────────────────────────────────────────┤
 │ Library      │                                                │
 │ Grid         │              Route content                     │

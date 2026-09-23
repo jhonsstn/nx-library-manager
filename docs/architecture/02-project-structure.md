@@ -3,7 +3,7 @@
 ## Repository layout
 
 ```text
-switch-game-catalog/
+nx-library-manager/
 ├── package.json
 ├── electron-builder.yml
 ├── vite.config.ts

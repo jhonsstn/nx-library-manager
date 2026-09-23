@@ -359,7 +359,7 @@ export function SettingsForm() {
       <section className="panel">
         <h2 className="panel__title">Application</h2>
         <div className="row row--wrap">
-          <span>Switch Game Catalog v{version.data ?? '—'}</span>
+          <span>NX Library Manager v{version.data ?? '—'}</span>
           <Button onClick={() => void checkForUpdates()} disabled={checking}>
             Check for Updates
           </Button>

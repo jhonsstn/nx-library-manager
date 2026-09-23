@@ -22,8 +22,8 @@ export const TITLEDB_VERSIONS_TXT_URL = 'https://raw.githubusercontent.com/blawa
 export const TITLEDB_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export const RELEASES_API_URL =
-  'https://api.github.com/repos/jhonsstn/switch-game-catalog/releases/latest';
-export const RELEASES_PAGE_URL = 'https://github.com/jhonsstn/switch-game-catalog/releases';
+  'https://api.github.com/repos/jhonsstn/nx-library-manager/releases/latest';
+export const RELEASES_PAGE_URL = 'https://github.com/jhonsstn/nx-library-manager/releases';
 
 export const CATALOG_IMAGE_SCHEME = 'catalog-image';
 

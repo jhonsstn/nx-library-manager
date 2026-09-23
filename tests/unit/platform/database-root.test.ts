@@ -6,30 +6,30 @@ describe('catalog database location', () => {
   it('stores the development database in the app root', () => {
     const root = resolveDatabaseRoot({
       isPackaged: false,
-      appPath: '/workspace/switch-game-catalog',
+      appPath: '/workspace/nx-library-manager',
       executablePath: '/tools/electron',
       platform: 'win32',
     });
-    expect(root).toBe('/workspace/switch-game-catalog');
-    const paths = resolveAppPaths('/user-data/Switch Game Catalog', root);
-    expect(paths.databaseFile).toBe('/workspace/switch-game-catalog/library.sqlite3');
-    expect(paths.settingsFile).toBe('/user-data/Switch Game Catalog/settings.json');
+    expect(root).toBe('/workspace/nx-library-manager');
+    const paths = resolveAppPaths('/user-data/NX Library Manager', root);
+    expect(paths.databaseFile).toBe('/workspace/nx-library-manager/library.sqlite3');
+    expect(paths.settingsFile).toBe('/user-data/NX Library Manager/settings.json');
   });
 
   it('stores the packaged Windows database beside the executable', () => {
     expect(resolveDatabaseRoot({
       isPackaged: true,
-      appPath: '/apps/sgc/resources/app.asar',
-      executablePath: '/apps/sgc/Switch Game Catalog.exe',
+      appPath: '/apps/nlm/resources/app.asar',
+      executablePath: '/apps/nlm/NX Library Manager.exe',
       platform: 'win32',
-    })).toBe('/apps/sgc');
+    })).toBe('/apps/nlm');
   });
 
   it('stores a portable Windows database beside the original portable executable', () => {
     expect(resolveDatabaseRoot({
       isPackaged: true,
       appPath: '/tmp/portable/app.asar',
-      executablePath: '/tmp/portable/Switch Game Catalog.exe',
+      executablePath: '/tmp/portable/NX Library Manager.exe',
       platform: 'win32',
       portableExecutableDir: '/games/catalog',
     })).toBe('/games/catalog');
@@ -38,8 +38,8 @@ describe('catalog database location', () => {
   it('stores the packaged macOS database beside the app bundle', () => {
     expect(resolveDatabaseRoot({
       isPackaged: true,
-      appPath: '/apps/Switch Game Catalog.app/Contents/Resources/app.asar',
-      executablePath: '/apps/Switch Game Catalog.app/Contents/MacOS/Switch Game Catalog',
+      appPath: '/apps/NX Library Manager.app/Contents/Resources/app.asar',
+      executablePath: '/apps/NX Library Manager.app/Contents/MacOS/NX Library Manager',
       platform: 'darwin',
     })).toBe('/apps');
   });
@@ -47,7 +47,7 @@ describe('catalog database location', () => {
   it('allows an isolated development database for end-to-end tests', () => {
     expect(resolveDatabaseRoot({
       isPackaged: false,
-      appPath: '/workspace/switch-game-catalog',
+      appPath: '/workspace/nx-library-manager',
       executablePath: '/tools/electron',
       platform: 'linux',
       developmentOverride: '/tmp/catalog-test',

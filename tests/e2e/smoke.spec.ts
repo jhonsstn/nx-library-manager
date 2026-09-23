@@ -39,9 +39,9 @@ async function launch(): Promise<void> {
 }
 
 test.beforeAll(async () => {
-  userDataDir = mkdtempSync(join(tmpdir(), 'sgc-e2e-userdata-'));
-  libraryDir = mkdtempSync(join(tmpdir(), 'sgc-e2e-library-'));
-  updatesDir = mkdtempSync(join(tmpdir(), 'sgc-e2e-updates-'));
+  userDataDir = mkdtempSync(join(tmpdir(), 'nlm-e2e-userdata-'));
+  libraryDir = mkdtempSync(join(tmpdir(), 'nlm-e2e-library-'));
+  updatesDir = mkdtempSync(join(tmpdir(), 'nlm-e2e-updates-'));
   serverPort = await freePort();
 
   // Fake package files: only names and sizes matter to the scanner.
@@ -72,7 +72,7 @@ test('launches with a working shell and no Node access in the renderer', async (
   });
   expect(existsSync(join(userDataDir, 'library.sqlite3'))).toBe(true);
 
-  await expect(page.getByText('Switch Game Catalog').first()).toBeVisible();
+  await expect(page.getByText('NX Library Manager').first()).toBeVisible();
   await expect(page.getByRole('link', { name: 'Library' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
 

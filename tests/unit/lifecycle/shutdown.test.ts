@@ -33,7 +33,7 @@ describe('ShutdownCoordinator', () => {
     expect(quit).toHaveBeenCalledOnce();
     expect(onStatus).toHaveBeenLastCalledWith({
       phase: 'closing',
-      message: 'Closing Switch Game Catalog…',
+      message: 'Closing NX Library Manager…',
     });
     const reentry = { preventDefault: vi.fn() };
     expect(coordinator.request(reentry)).toBe(true);

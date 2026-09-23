@@ -23,7 +23,7 @@ export function createMainWindow(options: MainWindowOptions): BrowserWindow {
     backgroundColor: '#1a1a1a',
     show: false,
     autoHideMenuBar: true,
-    title: 'Switch Game Catalog',
+    title: 'NX Library Manager',
     icon: options.iconPath,
     webPreferences: {
       preload: options.preloadPath,

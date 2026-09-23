@@ -1,10 +1,10 @@
 {
-  "name": "switch-game-catalog",
-  "productName": "Switch Game Catalog",
+  "name": "nx-library-manager",
+  "productName": "NX Library Manager",
   "version": "0.1.0",
   "description": "Local desktop catalog for personal Nintendo Switch game files.",
   "author": {
-    "name": "Switch Game Catalog contributors"
+    "name": "NX Library Manager contributors"
   },
   "license": "MIT",
   "private": true,

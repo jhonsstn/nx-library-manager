@@ -1,6 +1,6 @@
-appId: com.switchgamecatalog.app
-productName: Switch Game Catalog
-copyright: Switch Game Catalog contributors
+appId: com.nxlibrarymanager.app
+productName: NX Library Manager
+copyright: NX Library Manager contributors
 
 directories:
   output: release

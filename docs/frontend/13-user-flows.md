@@ -2,7 +2,7 @@
 
 ## First launch
 
-1. Electron creates an empty user-data directory and database.
+1. Electron creates `library.sqlite3` and `data/` beside the executable.
 2. The initial schema is applied.
 3. Cached TitleDB data, if any, is loaded before the window opens.
 4. The library opens empty and the user configures scan folders in Settings.

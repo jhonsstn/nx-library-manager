@@ -2,7 +2,7 @@
 
 Switch Game Catalog is a standalone Electron desktop app for cataloging personal Nintendo Switch package files, enriching entries with IGDB metadata, tracking available versions, and moving or serving files for installation.
 
-It is a new application with its own database, settings, caches, and user-data directory. It does **not** import, migrate, read, or share data with the earlier Python application.
+It is a portable application with its own database, settings, and caches beside the executable. It does **not** import, migrate, read, or share data with the earlier Python application.
 
 ## Requirements and setup
 
@@ -29,18 +29,14 @@ pnpm run test:e2e    # build and run Playwright against Electron
 pnpm run build       # production main, preload, and renderer bundles
 pnpm run verify      # type-check, tests, and production build
 pnpm run package:dir # unpacked packaging smoke test
-pnpm run package:win # Windows NSIS and portable packages
+pnpm run package:win # portable Windows executable
 ```
 
-## User data
+## Portable data
 
-Electron chooses the platform user-data root. A fresh installation normally uses:
+The Windows release is a single portable `.exe`. `library.sqlite3` and migration backups live beside that `.exe`; `data/` beside it contains settings, encrypted keys, caches, logs, and Electron session data. In development, the same layout is created in the project root. Move the `.exe`, database, and `data/` together to retain the catalog. Database migrations apply only to databases created by this Electron app.
 
-- Windows: `%APPDATA%\Switch Game Catalog`
-- macOS: `~/Library/Application Support/Switch Game Catalog`
-- Linux: `~/.config/Switch Game Catalog`
-
-The directory contains `library.sqlite3`, `settings.json`, version caches, image caches, logs, and migration backups. Database migrations apply only to databases created by this Electron app.
+Secrets encrypted by Electron `safeStorage` may need to be imported again on another machine or OS account.
 
 ## Catalog scanning
 
@@ -66,6 +62,6 @@ Basic Authentication over plain HTTP does not encrypt credentials or traffic. Us
 
 ## Packaging and releases
 
-`electron-builder.yml` defines Windows x64 NSIS and portable targets. The manual/tag release workflow builds both, generates SHA-256 checksums, and attaches artifacts to tagged GitHub releases. Pull requests and `main` use a separate Windows workflow for frozen dependency installation, type-checking, tests, and the production build.
+`electron-builder.yml` defines only a Windows x64 portable target. The manual/tag release workflow builds it, generates a SHA-256 checksum, and attaches it to tagged GitHub releases. Pull requests and `main` use a separate Windows workflow for frozen dependency installation, type-checking, tests, and the production build.
 
 See [docs/README.md](docs/README.md) for architecture details and [docs/release-checklist.md](docs/release-checklist.md) for release gates and the Windows manual test matrix.

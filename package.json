@@ -23,7 +23,7 @@
     "test:watch": "vitest",
     "test:e2e": "pnpm run build && playwright test",
     "verify": "pnpm run typecheck && pnpm test && pnpm run build",
-    "package:win": "electron-builder --win --x64",
+    "package:win": "electron-builder --win portable --x64",
     "package:dir": "electron-builder --dir"
   },
   "dependencies": {

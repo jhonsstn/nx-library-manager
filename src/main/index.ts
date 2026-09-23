@@ -1,4 +1,5 @@
 import { app, BrowserWindow } from 'electron';
+import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { closeDatabase, openDatabase, type AppDatabase } from './db/database';
 import { runMigrations } from './db/migrations';
@@ -57,6 +58,29 @@ const shutdownCoordinator = new ShutdownCoordinator({
 
 registerAppSchemes();
 
+const smokeTest = process.argv.includes('--smoke-test');
+const developmentOverride = process.argv.find((arg) => arg.startsWith('--database-root='))?.slice('--database-root='.length);
+const appRoot = resolveDatabaseRoot({
+  isPackaged: app.isPackaged,
+  appPath: app.getAppPath(),
+  executablePath: app.getPath('exe'),
+  platform: process.platform,
+  portableExecutableDir: process.env.PORTABLE_EXECUTABLE_DIR,
+  developmentOverride,
+});
+const portableDataRoot = join(appRoot, 'data');
+
+// Configure Chromium storage before Electron's ready event so cookies, GPU
+// caches and the app's own settings travel with the portable executable.
+if (!smokeTest) {
+  mkdirSync(portableDataRoot, { recursive: true });
+  const sessionRoot = join(portableDataRoot, 'session');
+  mkdirSync(sessionRoot, { recursive: true });
+  app.setPath('userData', portableDataRoot);
+  app.setPath('sessionData', sessionRoot);
+  app.setAppLogsPath(join(portableDataRoot, 'logs'));
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -75,7 +99,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   void app.whenReady().then(() => {
-    if (process.argv.includes('--smoke-test')) {
+    if (smokeTest) {
       void runPackagedSmoke().then(
         () => { process.stdout.write('Package smoke passed\n'); app.exit(0); },
         (error: unknown) => {
@@ -90,16 +114,7 @@ if (!app.requestSingleInstanceLock()) {
 function bootstrap(): void {
   app.setAppUserModelId('com.switchgamecatalog.app');
 
-  const developmentOverride = process.argv.find((arg) => arg.startsWith('--database-root='))?.slice('--database-root='.length);
-  const databaseRoot = resolveDatabaseRoot({
-    isPackaged: app.isPackaged,
-    appPath: app.getAppPath(),
-    executablePath: app.getPath('exe'),
-    platform: process.platform,
-    portableExecutableDir: process.env.PORTABLE_EXECUTABLE_DIR,
-    developmentOverride,
-  });
-  const paths = resolveAppPaths(app.getPath('userData'), databaseRoot);
+  const paths = resolveAppPaths(app.getPath('userData'), appRoot);
   ensureAppPaths(paths);
   const logger = createLogger({ logsDir: paths.logsDir, level: app.isPackaged ? 'info' : 'debug' });
 

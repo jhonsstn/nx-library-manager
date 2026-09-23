@@ -4,7 +4,7 @@
 
 - [ ] `pnpm install --frozen-lockfile` succeeds.
 - [ ] `pnpm run verify` succeeds.
-- [ ] `pnpm run test:e2e` succeeds from a clean user-data directory.
+- [ ] `pnpm run test:e2e` succeeds from a clean portable data directory.
 - [ ] `pnpm run package:dir` produces a launchable unpacked app.
 - [ ] `git diff --check` reports no whitespace errors.
 - [ ] Windows pull-request/main verification is green.
@@ -24,8 +24,8 @@
 
 ## Windows release matrix
 
-- [ ] NSIS install, launch, update, and uninstall.
-- [ ] Portable launch with a fresh profile.
+- [ ] Portable launch creates `library.sqlite3` and `data/` beside the executable.
+- [ ] Moving the executable, database, and `data/` retains the catalog.
 - [ ] Cross-drive progress, cancellation, and cleanup.
 - [ ] Real NAND and SD MTP installs.
 - [ ] Quit during local and MTP transfers.

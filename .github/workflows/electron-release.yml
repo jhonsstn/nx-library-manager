@@ -40,8 +40,8 @@ jobs:
       # better-sqlite3 ships N-API prebuilds for every platform (win32-x64
       # included), so no per-ABI rebuild is needed. electron-builder still runs
       # its npmRebuild step, which is a no-op for an N-API module.
-      - name: Package Windows installer and portable build
-        run: pnpm exec electron-builder --win --x64 --publish never
+      - name: Package portable Windows app
+        run: pnpm exec electron-builder --win portable --x64 --publish never
 
       - name: Smoke test packaged app
         shell: pwsh
@@ -49,11 +49,19 @@ jobs:
           & 'release/win-unpacked/Switch Game Catalog.exe' --smoke-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Smoke test portable executable
+        shell: pwsh
+        run: |
+          $portable = Get-ChildItem release -Filter '*-portable.exe' -File | Select-Object -First 1
+          if (-not $portable) { throw 'Portable executable was not produced' }
+          & $portable.FullName --smoke-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Generate checksums
         shell: pwsh
         run: |
           Get-ChildItem release -File |
-            Where-Object { $_.Name -match '\.(exe|zip)$' } |
+            Where-Object { $_.Name -like '*-portable.exe' } |
             ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash + '  ' + $_.Name } |
             Set-Content release/SHA256SUMS.txt
 
@@ -62,7 +70,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/*.exe
+            release/*-portable.exe
             release/SHA256SUMS.txt
 
       - name: Upload build artifacts
@@ -71,5 +79,5 @@ jobs:
         with:
           name: switch-game-catalog-windows
           path: |
-            release/*.exe
+            release/*-portable.exe
             release/SHA256SUMS.txt

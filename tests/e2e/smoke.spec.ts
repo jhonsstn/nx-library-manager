@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
 import { createServer } from 'node:net';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -62,6 +62,16 @@ test.afterAll(async () => {
 });
 
 test('launches with a working shell and no Node access in the renderer', async () => {
+  const storage = await app.evaluate(({ app: electronApp }) => ({
+    userData: electronApp.getPath('userData'),
+    sessionData: electronApp.getPath('sessionData'),
+  }));
+  expect(storage).toEqual({
+    userData: join(userDataDir, 'data'),
+    sessionData: join(userDataDir, 'data', 'session'),
+  });
+  expect(existsSync(join(userDataDir, 'library.sqlite3'))).toBe(true);
+
   await expect(page.getByText('Switch Game Catalog').first()).toBeVisible();
   await expect(page.getByRole('link', { name: 'Library' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();

@@ -9,3 +9,4 @@ playwright-report/
 tests/.tmp/
 demo-game-lib/
 /library.sqlite3*
+/data/

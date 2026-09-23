@@ -25,25 +25,11 @@ npmRebuild: true
 
 win:
   target:
-    - target: nsis
-      arch:
-        - x64
     - target: portable
       arch:
         - x64
   icon: resources/icon.ico
-  # Per-user install is the default for NSIS; no admin prompt required.
   requestedExecutionLevel: asInvoker
-
-nsis:
-  oneClick: false
-  perMachine: false
-  allowToChangeInstallationDirectory: true
-  createDesktopShortcut: true
-  createStartMenuShortcut: true
-  shortcutName: Switch Game Catalog
-  deleteAppDataOnUninstall: false
-  artifactName: ${productName}-${version}-setup.${ext}
 
 portable:
   artifactName: ${productName}-${version}-portable.${ext}

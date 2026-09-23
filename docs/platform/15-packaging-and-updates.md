@@ -8,17 +8,14 @@ ARM64 may be added after validating native dependencies such as `better-sqlite3`
 
 ## Build outputs
 
-Provide:
-- standard installer `.exe`;
-- optional portable `.exe` or zipped portable build.
+Provide a single portable Windows `.exe`.
 
-## Installer behavior
+## Portable behavior
 
-- install per-user by default unless admin install is explicitly needed;
-- Start Menu shortcut;
-- optional Desktop shortcut;
-- no user catalog data stored in install directory;
-- uninstall does not delete catalog database/settings without explicit user choice.
+- The catalog database is beside the launched portable `.exe`.
+- Settings, encrypted keys, caches, and logs are in an adjacent `data/` directory.
+- The app does not create Start Menu or Desktop shortcuts.
+- Moving the executable together with the database and `data/` retains the catalog.
 
 ## Native dependencies
 
@@ -35,8 +32,7 @@ Unsigned builds are acceptable for early personal/test releases but should not b
 ## Release artifacts
 
 GitHub Release should contain:
-- installer;
-- portable build if supported;
+- portable executable;
 - checksums;
 - release notes.
 

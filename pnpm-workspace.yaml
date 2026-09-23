@@ -1,0 +1,11 @@
+# pnpm settings. Since pnpm v11 these live here rather than in package.json.
+allowBuilds:
+  # Ships N-API prebuilds for every platform (win32-x64 included), which its
+  # loader resolves without a build dir, so pnpm's implicit `node-gyp rebuild`
+  # (triggered by the package's binding.gyp) is unnecessary. Denying it keeps
+  # installs fast, hermetic and toolchain-free.
+  better-sqlite3: false
+  # Selects the 7-Zip binary used when packaging the Windows installer.
+  electron-winstaller: true
+  # Postinstall links the platform-specific esbuild binary.
+  esbuild: true

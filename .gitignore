@@ -1,0 +1,12 @@
+node_modules/
+dist/
+out/
+release/
+.tmp/
+test-results/
+playwright-report/
+*.log
+tests/.tmp/
+demo-game-lib/
+/library.sqlite3*
+/data/

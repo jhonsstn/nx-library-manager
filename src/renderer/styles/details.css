@@ -1,0 +1,445 @@
+/* Library / grid / details styles (cluster A).
+   Complements the shared vocabulary in `global.css`: only what the Library,
+   Grid, Favorites and game-details surfaces add on top of it. */
+
+/* ---------- Library ---------- */
+
+.pane-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.library-filters {
+  flex: none;
+}
+
+.library-filters__search {
+  flex: 3 1 200px;
+  width: auto;
+  min-width: 160px;
+}
+
+.library-filters__genre {
+  flex: 1 1 140px;
+  width: auto;
+  min-width: 120px;
+}
+
+.library-filters__progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.library-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.library-row {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.library-row__badges {
+  display: flex;
+  flex: none;
+  gap: var(--space-1);
+}
+
+.library-skeletons {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ---------- Grid ---------- */
+
+.grid-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.grid-virtual {
+  position: relative;
+  width: 100%;
+}
+
+.grid__row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+}
+
+.grid-toolbar__range {
+  flex: 1 1 220px;
+  max-width: 360px;
+  width: auto;
+}
+
+.grid-toolbar__size {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  min-width: 56px;
+}
+
+.grid__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.grid__art--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--border);
+}
+
+/* ---------- Details ---------- */
+
+.game-details {
+  container-type: inline-size;
+}
+
+.game-details .details {
+  grid-template-columns: 205px minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.game-details .cover {
+  width: 205px;
+  height: 280px;
+}
+
+.details__overview {
+  min-width: 0;
+}
+
+.details__byline,
+.details__file-summary,
+.details__installed {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--space-2);
+}
+
+.details__file-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details__identity {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.details__title-id {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.details__update-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--bg-elevated);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+
+.details__update-card strong {
+  font-size: var(--font-size);
+}
+
+.details__update-card--warning {
+  border-color: var(--warning);
+}
+
+.details__update-card--warning strong {
+  color: var(--warning);
+}
+
+.details__update-card--success {
+  border-color: var(--success);
+}
+
+.details__update-card--success strong {
+  color: var(--success);
+}
+
+.details__actions {
+  margin: var(--space-3) 0;
+}
+
+.details__disclosure {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+.details__disclosure summary {
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.details__disclosure summary:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.details__disclosure summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.details__description {
+  max-height: 280px;
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.details__subheading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.details__subheading h4 {
+  margin: 0;
+  font-size: var(--font-size);
+}
+
+.details__subheading span,
+.details__source-note {
+  color: var(--text-dim);
+  font-size: var(--font-size-sm);
+}
+
+.details__known-dlc {
+  margin-bottom: var(--space-4);
+}
+
+.details__dlc-list,
+.details__package-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+.details__dlc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.details__dlc-row + .details__dlc-row,
+.details__package-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.details__dlc-name {
+  min-width: 0;
+}
+
+.details__dlc-name small {
+  display: block;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  margin-top: var(--space-1);
+}
+
+.details__dlc-row .badge {
+  flex: none;
+}
+
+.details__source-note {
+  margin: var(--space-2) 0 0;
+}
+
+.details__package-details summary span {
+  float: right;
+  font-weight: 400;
+  font-size: var(--font-size-sm);
+}
+
+.details__package-path,
+.details__package-list li,
+.details__package-history {
+  padding: var(--space-2) var(--space-3);
+}
+
+.details__package-path,
+.details__package-list small {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.details__package-history h4 {
+  margin: 0 0 var(--space-1);
+}
+
+.details__package-history ul {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.details__package-list small {
+  display: block;
+  margin-top: var(--space-1);
+}
+
+@container (max-width: 580px) {
+  .game-details .details {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .game-details .cover {
+    width: 160px;
+    height: 218px;
+  }
+}
+
+.details__section-title {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--font-size);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.updates-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 220px;
+  overflow: auto;
+  margin-bottom: var(--space-3);
+  background: var(--bg-panel);
+}
+
+.updates-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  font-size: var(--font-size-sm);
+}
+
+.updates-list__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.updates-list__version {
+  flex: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.updates-list__empty {
+  padding: var(--space-3);
+}
+
+.install-summary {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-2);
+}
+
+/* ---------- Screenshot viewer / trailer ---------- */
+
+.screenshot-thumb {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  cursor: zoom-in;
+}
+
+.screenshot-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.screenshot-thumb:focus-visible {
+  border-color: var(--accent);
+}
+
+.screenshot-viewer {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.screenshot-viewer img {
+  width: 100%;
+  max-height: 65vh;
+  object-fit: contain;
+  background: var(--bg-panel);
+  border-radius: var(--radius);
+}
+
+.trailer-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #000;
+}

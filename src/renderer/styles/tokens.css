@@ -1,0 +1,60 @@
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #1a1a1a;
+  --bg-elevated: #212121;
+  --bg-panel: #151515;
+  --bg-hover: #2a2a2a;
+  --bg-active: #303030;
+
+  /* Lines */
+  --border: #3a3a3a;
+  --border-strong: #4d4d4d;
+
+  /* Text */
+  --text: #f8f8f2;
+  --text-muted: #b0b3b8;
+  --text-dim: #7f848e;
+
+  /* Accents (Dracula-derived, matching the Qt theme) */
+  --accent: #8be9fd;
+  --accent-strong: #5ed3ee;
+  --favorite: #ff79c6;
+  --danger: #ff5555;
+  --warning: #f1fa8c;
+  --success: #50fa7b;
+
+  /* Shape */
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --font-size-sm: 12px;
+  --font-size: 14px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+
+  --shadow-popover: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --focus-ring: 0 0 0 2px rgba(139, 233, 253, 0.75);
+
+  --sidebar-width: 190px;
+  --statusbar-height: 28px;
+}
+
+/* A light theme is intentionally not implemented yet; these hooks exist so it
+   only requires defining the same token set under a different selector. */
+[data-theme='light'] {
+  color-scheme: light;
+}

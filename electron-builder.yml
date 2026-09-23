@@ -1,0 +1,37 @@
+appId: com.nxlibrarymanager.app
+productName: NX Library Manager
+copyright: NX Library Manager contributors
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - dist/**/*
+  - package.json
+  - '!**/*.map'
+
+extraResources:
+  - from: resources/scripts
+    to: scripts
+  - from: resources/icon.png
+    to: icon.png
+
+asarUnpack:
+  - '**/*.node'
+
+# better-sqlite3 is a native module and must be rebuilt against the Electron ABI.
+npmRebuild: true
+
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  icon: resources/icon.ico
+  requestedExecutionLevel: asInvoker
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+publish: null

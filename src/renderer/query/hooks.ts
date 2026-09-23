@@ -8,7 +8,7 @@ import type {
   MoveFileInput,
   ScanInput,
 } from '@shared/contracts/api';
-import type { MetadataCandidateDto, PagedResult, GameSummaryDto } from '@shared/types/domain';
+import type { MetadataCandidateDto, PagedResult, GameSummaryDto, UpdateCleanupPreviewDto } from '@shared/types/domain';
 import type { SettingsUpdateInput } from '@shared/types/settings';
 import { getCatalogApi } from '../api';
 import { catalogKeysToInvalidate, queryKeys } from './keys';
@@ -98,6 +98,17 @@ export function useSetNeedsReview() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['games'] });
       await queryClient.invalidateQueries({ queryKey: ['game'] });
+    },
+  });
+}
+
+export function useSetHidden() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ gameId, hidden }: { gameId: number; hidden: boolean }) =>
+      getCatalogApi().catalog.setHidden(gameId, hidden),
+    onSuccess: async () => {
+      for (const key of catalogKeysToInvalidate()) await queryClient.invalidateQueries({ queryKey: key });
     },
   });
 }
@@ -214,6 +225,11 @@ export function useFileMutations() {
     }),
     deleteFile: useMutation({
       mutationFn: (input: DeleteFileInput) => getCatalogApi().files.deleteFile(input),
+      onSuccess: invalidate,
+    }),
+    cleanOldUpdates: useMutation({
+      mutationFn: ({ gameId, preview }: { gameId: number; preview: UpdateCleanupPreviewDto }) =>
+        getCatalogApi().files.cleanOldUpdates(gameId, preview),
       onSuccess: invalidate,
     }),
     moveFile: useMutation({

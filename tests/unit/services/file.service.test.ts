@@ -12,6 +12,7 @@ import { listScreenshots, replaceScreenshots } from '@main/repositories/screensh
 import { getUpdate, listAllUpdates, upsertUpdate } from '@main/repositories/updates.repository';
 import { FileService, deleteFileIfPresent, moveFileToFolder, uniqueDestinationPath } from '@main/services/file.service';
 import { recordInspection } from '@main/repositories/title-catalog.repository';
+import { previewOldUpdates } from '@main/repositories/update-cleanup.repository';
 import { SwitchCatalogError } from '@shared/errors/app-error';
 import type { AppErrorCode } from '@shared/errors/codes';
 
@@ -146,6 +147,93 @@ describe('combined physical files', () => {
     expect(db.prepare('SELECT count(*) AS n FROM local_files').get()).toMatchObject({ n:0 });
     expect(db.prepare('SELECT count(*) AS n FROM file_titles').get()).toMatchObject({ n:0 });
     expect(listGameFiles(db,gameId)).toHaveLength(0);
+  });
+});
+
+describe('older update cleaner', () => {
+  const baseId = '0100AABBCCDD0000';
+  const patchId = '0100AABBCCDD0800';
+
+  function inspectedFile(db: AppDatabase, filePath: string, titles: Parameters<typeof recordInspection>[1]['titles']) {
+    const info = statSync(filePath);
+    recordInspection(db, {
+      path: filePath, size: info.size, mtime: info.mtimeMs,
+      parserVersion: 1, keysRevision: 1, titles, error: null,
+    });
+  }
+
+  function patch(version: number): Parameters<typeof recordInspection>[1]['titles'][number] {
+    return { titleId: patchId, baseTitleId: baseId, type: 'update', rawVersion: version,
+      name: null, publisher: null, source: 'cnmt' };
+  }
+
+  function trackedUpdate(db: AppDatabase, libraryDir: string, gameId: number, name: string,
+    version: number, extraTitles: Parameters<typeof recordInspection>[1]['titles'] = []) {
+    const filePath = writeFile(join(libraryDir, name), name);
+    const info = statSync(filePath);
+    upsertUpdate(db, { gameId, filePath, fileName: name, detectedVersion: String(version),
+      fileSize: info.size, modifiedTime: info.mtimeMs, matchConfidence: 1 });
+    inspectedFile(db, filePath, [patch(version), ...extraTitles]);
+    return filePath;
+  }
+
+  it('removes only older verified matched update-only packages', async () => {
+    const { db, service, libraryDir } = createHarness();
+    const { gameId, filePath: basePath } = seedGame(db, libraryDir);
+    inspectedFile(db, basePath, [{ titleId: baseId, baseTitleId: baseId, type: 'base',
+      rawVersion: 0, name: 'Game', publisher: null, source: 'cnmt' }]);
+    const old = trackedUpdate(db, libraryDir, gameId, 'old.nsp', 65536);
+    const latest = trackedUpdate(db, libraryDir, gameId, 'latest.nsp', 131072);
+    const dlc = trackedUpdate(db, libraryDir, gameId, 'update-with-dlc.nsp', 32768, [
+      { titleId: '0100AABBCCDD1001', baseTitleId: baseId, type: 'dlc', rawVersion: 0,
+        name: null, publisher: null, source: 'cnmt' },
+    ]);
+    const unmatched = writeFile(join(libraryDir, 'unmatched.nsp'), 'unmatched');
+    inspectedFile(db, unmatched, [patch(262144)]);
+
+    const preview = previewOldUpdates(db, gameId);
+    expect(preview.latestLocalVersion).toBe(131072);
+    expect(preview.deleteFiles.map((file) => file.filePath)).toEqual([old]);
+    expect(preview.keepFiles.map((file) => file.filePath)).toEqual([latest]);
+    const result = await service.cleanOldUpdates(gameId, preview);
+    expect(result.deletedFiles).toBe(1);
+    expect(existsSync(old)).toBe(false);
+    expect(existsSync(latest)).toBe(true);
+    expect(existsSync(dlc)).toBe(true);
+    expect(existsSync(unmatched)).toBe(true);
+    expect(existsSync(basePath)).toBe(true);
+    expect(db.prepare('SELECT id FROM local_files WHERE file_path=?').get(old)).toBeUndefined();
+  });
+
+  it('keeps a combined package with the latest patch and rejects a stale preview', async () => {
+    const { db, service, libraryDir } = createHarness();
+    const { gameId, filePath: basePath } = seedGame(db, libraryDir);
+    inspectedFile(db, basePath, [
+      { titleId: baseId, baseTitleId: baseId, type: 'base', rawVersion: 0,
+        name: 'Game', publisher: null, source: 'cnmt' },
+      patch(131072),
+    ]);
+    const old = trackedUpdate(db, libraryDir, gameId, 'old.nsp', 65536);
+    const preview = previewOldUpdates(db, gameId);
+    expect(preview.keepFiles.map((file) => file.filePath)).toEqual([basePath]);
+    expect(preview.deleteFiles.map((file) => file.filePath)).toEqual([old]);
+    writeFile(old, 'replacement');
+    await expectAppError(service.cleanOldUpdates(gameId, preview), 'VALIDATION_ERROR');
+    expect(existsSync(old)).toBe(true);
+    expect(existsSync(basePath)).toBe(true);
+  });
+
+  it('does not remove an older patch if the kept newest package disappears', async () => {
+    const { db, service, libraryDir } = createHarness();
+    const { gameId, filePath: basePath } = seedGame(db, libraryDir);
+    inspectedFile(db, basePath, [{ titleId: baseId, baseTitleId: baseId, type: 'base',
+      rawVersion: 0, name: 'Game', publisher: null, source: 'cnmt' }]);
+    const old = trackedUpdate(db, libraryDir, gameId, 'old.nsp', 65536);
+    const latest = trackedUpdate(db, libraryDir, gameId, 'latest.nsp', 131072);
+    const preview = previewOldUpdates(db, gameId);
+    unlinkSync(latest);
+    await expectAppError(service.cleanOldUpdates(gameId, preview), 'FILE_MISSING');
+    expect(existsSync(old)).toBe(true);
   });
 });
 

@@ -78,6 +78,25 @@ export interface VersionStatusDto {
   uncertainty?: string | null;
 }
 
+export interface UpdateCleanupFileDto {
+  filePath: string;
+  fileName: string;
+  fileSize: number;
+  modifiedTime: number;
+  rawVersion: number;
+}
+
+export interface UpdateCleanupPreviewDto {
+  latestLocalVersion: number | null;
+  keepFiles: UpdateCleanupFileDto[];
+  deleteFiles: UpdateCleanupFileDto[];
+}
+
+export interface UpdateCleanupResultDto {
+  deletedFiles: number;
+  freedBytes: number;
+}
+
 export interface ContainedTitleDto {
   titleId: string | null;
   baseTitleId: string | null;
@@ -93,6 +112,7 @@ export interface ContainedTitleDto {
 export interface KnownDlcDto {
   titleId: string;
   name: string;
+  nameSource: 'titledb' | 'package' | 'filename' | 'title-id';
   filePresent: boolean;
 }
 
@@ -109,6 +129,7 @@ export interface GameSummaryDto {
   displayTitle: string;
   cleanedTitle: string;
   favorite: boolean;
+  hidden: boolean;
   needsReview: boolean;
   metadataLocked: boolean;
   metadataProvider: string | null;
@@ -134,6 +155,7 @@ export interface GameDetailsDto extends GameSummaryDto {
   updates: UpdateFileDto[];
   screenshots: ScreenshotDto[];
   versionStatus: VersionStatusDto;
+  updateCleanup?: UpdateCleanupPreviewDto;
   installed: InstalledStatusDto | null;
   containedTitles?: ContainedTitleDto[];
   knownDlc?: KnownDlcDto[];

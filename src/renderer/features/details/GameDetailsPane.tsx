@@ -7,7 +7,7 @@ import {
   releasedVersionLabel,
   versionLabel,
 } from '@shared/format/versions';
-import type { GameDetailsDto, UpdateFileDto, UpdateGroupName } from '@shared/types/domain';
+import type { GameDetailsDto, UpdateCleanupPreviewDto, UpdateFileDto, UpdateGroupName } from '@shared/types/domain';
 import { Cover } from '@renderer/components/Cover';
 import { ErrorText, Skeleton } from '@renderer/components/Feedback';
 import { ConfirmDialog } from '@renderer/components/Modal';
@@ -21,6 +21,7 @@ import {
   useGame,
   useSetFavorite,
   useSetNeedsReview,
+  useSetHidden,
   useUnmatchUpdates,
 } from '@renderer/query/hooks';
 import { ScreenshotViewer } from './ScreenshotViewer';
@@ -28,6 +29,7 @@ import { TrailerDialog } from './TrailerDialog';
 
 export interface GameDetailsPaneProps {
   gameId: number;
+  onVisibilityChange?: () => void;
 }
 
 /** Group order used by `ui.load_game` when it buckets updates by file name. */
@@ -57,18 +59,21 @@ function compactFileName(fileName: string): string {
  * version status, description, the grouped DLC/update list with multi-select,
  * install controls and the screenshot strip.
  */
-export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
+export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneProps) {
   const query = useGame(gameId);
   const toast = useToast();
   const setFavorite = useSetFavorite();
   const setNeedsReview = useSetNeedsReview();
+  const setHidden = useSetHidden();
   const unmatchUpdates = useUnmatchUpdates();
   const deleteFile = useFileMutations().deleteFile;
+  const cleanOldUpdates = useFileMutations().cleanOldUpdates;
   const { open: openUpdateMenu, element: updateMenuElement } = useContextMenu();
 
   const [selectedUpdateIds, setSelectedUpdateIds] = useState<number[]>([]);
   const [installIds, setInstallIds] = useState<number[] | null>(null);
   const [deleteIds, setDeleteIds] = useState<number[] | null>(null);
+  const [cleanupPreview, setCleanupPreview] = useState<UpdateCleanupPreviewDto | null>(null);
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [screenshotIndex, setScreenshotIndex] = useState<number | null>(null);
 
@@ -76,6 +81,7 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
     setSelectedUpdateIds([]);
     setInstallIds(null);
     setDeleteIds(null);
+    setCleanupPreview(null);
     setTrailerOpen(false);
     setScreenshotIndex(null);
   }, [gameId]);
@@ -147,6 +153,16 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
     );
   };
 
+  const toggleHidden = () => {
+    setHidden.mutate({ gameId: details.id, hidden: !details.hidden }, {
+      onSuccess: () => {
+        toast.success(details.hidden ? 'Game restored' : 'Game hidden', details.displayTitle);
+        onVisibilityChange?.();
+      },
+      onError: (error) => toast.error('Could not change game visibility', errorMessage(error)),
+    });
+  };
+
   const openUpdatesMenu = (event: MouseEvent<HTMLElement>, updateId: number) => {
     const ids = selectedUpdateIds.includes(updateId) ? selectedUpdateIds : [updateId];
     setSelectedUpdateIds(ids);
@@ -189,6 +205,19 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
       .map((path) => `${path}${path === details.baseFile?.filePath ? ' (also contains the base game)' : ''}`)
       .join('\n');
 
+  const confirmCleanup = async () => {
+    if (!cleanupPreview) return;
+    const preview = cleanupPreview;
+    setCleanupPreview(null);
+    try {
+      const result = await cleanOldUpdates.mutateAsync({ gameId: details.id, preview });
+      toast.success('Older updates removed',
+        `${result.deletedFiles} file(s) deleted · ${formatBytes(result.freedBytes)} freed`);
+    } catch (error) {
+      toast.error('Could not clean older updates', errorMessage(error));
+    }
+  };
+
   return (
     <article className="stack game-details">
       <div className="details">
@@ -204,6 +233,7 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
           </p>
           <div className="details__identity">
             <span className="badge">{details.metadataProvider?.toUpperCase() ?? 'Local metadata'}</span>
+            {details.hidden ? <span className="badge">Hidden</span> : null}
             <span className="details__title-id">Title ID: {details.titleId ?? 'Unknown (provisional)'}</span>
           </div>
           <div className={`details__update-card details__update-card--${statusTone}`} role="status">
@@ -234,6 +264,9 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
             <Button onClick={toggleNeedsReview}>
               {details.needsReview ? 'Clear needs review' : 'Mark as needs review'}
             </Button>
+            <Button onClick={toggleHidden} disabled={setHidden.isPending}>
+              {details.hidden ? 'Restore to library' : 'Hide from library'}
+            </Button>
             {details.trailerUrl ? <Button onClick={() => setTrailerOpen(true)}>Trailer</Button> : null}
           </div>
           <details className="details__disclosure details__about" key={`about-${gameId}`}>
@@ -252,18 +285,31 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
           </div>
           <ul className="details__dlc-list">{knownDlc.map((item) => (
             <li className="details__dlc-row" key={item.titleId}>
-              <span className="details__dlc-name">{item.name}<small>{item.titleId}</small></span>
+              <span className="details__dlc-name">{item.name}<small>
+                {item.nameSource === 'title-id' ? 'Name unavailable' : `${item.titleId} · ${
+                  item.nameSource === 'filename' ? 'Filename' : item.nameSource === 'package'
+                    ? 'Package metadata' : 'TitleDB'}`}
+              </small></span>
               <span className={`badge ${item.filePresent ? 'badge--ok' : 'badge--update'}`}>
                 {item.filePresent ? 'File present' : 'File missing'}
               </span>
             </li>
           ))}</ul>
-          <p className="details__source-note">TitleDB · updated {details.knownDlcRefreshedAt?.slice(0, 10) ?? 'unknown date'} · file status refers to this library</p>
+          <p className="details__source-note">DLC IDs: TitleDB · updated {details.knownDlcRefreshedAt?.slice(0, 10) ?? 'unknown date'} · file status refers to this library</p>
         </div> : null}
         <div className="details__subheading details__subheading--local">
           <h4>Local files</h4>
           <span>{details.updates.length} update/DLC file{details.updates.length === 1 ? '' : 's'}</span>
         </div>
+        {details.updateCleanup?.deleteFiles.length ? <div className="details__cleanup">
+          <Button
+            disabled={cleanOldUpdates.isPending}
+            onClick={() => setCleanupPreview(details.updateCleanup ?? null)}
+          >
+            Clean older updates
+          </Button>
+          <span className="dim">Keeps the highest verified local patch version. Combined, unmatched, and unverified files are protected.</span>
+        </div> : null}
         <div className="updates-list" role="listbox" aria-multiselectable="true" aria-label="DLC and updates">
           {groups.length === 0 ? (
             <p className="dim updates-list__empty">No update or DLC files matched to this game yet.</p>
@@ -375,6 +421,16 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
           message={`Delete ${deleteIds.length} file(s) from disk?\n\n${deleteFileNames(deleteIds)}\n\nThis cannot be undone.`}
           onCancel={() => setDeleteIds(null)}
           onConfirm={() => void deleteSelectedUpdates(deleteIds)}
+        />
+      ) : null}
+      {cleanupPreview ? (
+        <ConfirmDialog
+          title="Clean older updates"
+          danger
+          confirmLabel="Delete older updates"
+          message={`Keep v${cleanupPreview.latestLocalVersion}:\n${cleanupPreview.keepFiles.map((file) => file.filePath).join('\n')}\n\nDelete ${cleanupPreview.deleteFiles.length} older update file(s) (${formatBytes(cleanupPreview.deleteFiles.reduce((size, file) => size + file.fileSize, 0))}):\n${cleanupPreview.deleteFiles.map((file) => `v${file.rawVersion} · ${file.filePath}`).join('\n')}\n\nThis cannot be undone. DLC, combined packages, unmatched and unverified files are excluded.`}
+          onCancel={() => setCleanupPreview(null)}
+          onConfirm={() => void confirmCleanup()}
         />
       ) : null}
     </article>

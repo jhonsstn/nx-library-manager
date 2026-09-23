@@ -256,6 +256,18 @@
   margin-bottom: var(--space-4);
 }
 
+.details__cleanup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+}
+
+.details__cleanup .dim {
+  font-size: var(--font-size-sm);
+}
+
 .details__dlc-list,
 .details__package-list {
   list-style: none;

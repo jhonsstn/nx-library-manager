@@ -7,7 +7,7 @@ import { useToast } from '@renderer/components/Toast';
 import { useSelection } from '@renderer/app/SelectionProvider';
 import { useDebouncedValue } from '@renderer/hooks/useDebouncedValue';
 import { useAppEvents } from '@renderer/query/AppEventsProvider';
-import { useExportBackup, useFileMutations, useGames, useGenres, useMarkAsUpdate, useScan, useSetFavorite } from '@renderer/query/hooks';
+import { useExportBackup, useFileMutations, useGames, useGenres, useMarkAsUpdate, useScan, useSetFavorite, useSetHidden } from '@renderer/query/hooks';
 import { GameDetailsPane } from '@renderer/features/details/GameDetailsPane';
 import { BulkMetadataDialog } from '@renderer/features/metadata/BulkMetadataDialog';
 import { MetadataRematchDialog } from '@renderer/features/metadata/MetadataRematchDialog';
@@ -30,6 +30,7 @@ export function LibraryPage() {
   const scan = useScan();
   const exportBackup = useExportBackup();
   const setFavorite = useSetFavorite();
+  const setHidden = useSetHidden();
   const markAsUpdate = useMarkAsUpdate();
   const deleteFile = useFileMutations().deleteFile;
   const { scanProgress } = useAppEvents();
@@ -40,6 +41,7 @@ export function LibraryPage() {
   const [genre, setGenre] = useState<string>(ALL_GENRES);
   const [needsReview, setNeedsReview] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
   const [bulkMetadataOpen, setBulkMetadataOpen] = useState(false);
   const [rematchGameId, setRematchGameId] = useState<number | null>(null);
   const [markTarget, setMarkTarget] = useState<GameSummaryDto | null>(null);
@@ -53,6 +55,7 @@ export function LibraryPage() {
     genre: genre === ALL_GENRES ? undefined : genre,
     needsReview,
     needsUpdate,
+    hiddenOnly: showHidden,
   });
   const genres = useGenres();
 
@@ -83,6 +86,16 @@ export function LibraryPage() {
         ),
     },
     { label: 'Mark as DLC/update', onSelect: () => setMarkTarget(game) },
+    {
+      label: game.hidden ? 'Restore to library' : 'Hide from library',
+      onSelect: () => setHidden.mutate({ gameId: game.id, hidden: !game.hidden }, {
+        onSuccess: () => {
+          if (selectedGameId === game.id) selectGame(null);
+          toast.success(game.hidden ? 'Game restored' : 'Game hidden', game.displayTitle);
+        },
+        onError: (error) => toast.error('Could not change game visibility', errorMessage(error)),
+      }),
+    },
     { label: 'Export catalog backup', onSelect: () => void runExportBackup() },
     {
       label: 'Delete game file from disk',
@@ -111,6 +124,8 @@ export function LibraryPage() {
             onNeedsReviewChange={setNeedsReview}
             needsUpdate={needsUpdate}
             onNeedsUpdateChange={setNeedsUpdate}
+            showHidden={showHidden}
+            onShowHiddenChange={(value) => { setShowHidden(value); selectGame(null); }}
             scanProgress={scanProgress}
             scanning={scanRunning}
             onRescan={runScan}
@@ -125,14 +140,14 @@ export function LibraryPage() {
             selectedGameId={selectedGameId}
             onSelect={selectGame}
             onContextMenu={openGameMenu}
-            emptyMessage="No games match the current filters."
+            emptyMessage={showHidden ? 'No hidden games match the current filters.' : 'No games match the current filters.'}
           />
         </section>
         <section className="split__pane split__pane--right" aria-label="Game details">
           {selectedGameId === null ? (
             <p className="empty-state">Select a game</p>
           ) : (
-            <GameDetailsPane gameId={selectedGameId} />
+            <GameDetailsPane gameId={selectedGameId} onVisibilityChange={() => selectGame(null)} />
           )}
         </section>
       </div>

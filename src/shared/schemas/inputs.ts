@@ -9,6 +9,7 @@ export const ListGamesInputSchema = z.object({
   favoritesOnly: z.boolean().optional(),
   needsReview: z.boolean().optional(),
   needsUpdate: z.boolean().optional(),
+  hiddenOnly: z.boolean().optional(),
   sort: z.enum(['title-asc', 'title-desc', 'added-desc']).optional(),
   limit: positiveInt.max(10_000).optional(),
   offset: z.number().int().nonnegative().optional(),
@@ -48,6 +49,18 @@ export const DeleteFileInputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('game'), gameId: positiveInt }),
   z.object({ kind: z.literal('update'), updateId: positiveInt }),
 ]);
+
+const UpdateCleanupFileSchema = z.object({
+  filePath: z.string().min(1), fileName: z.string().min(1),
+  fileSize: z.number().int().nonnegative(), modifiedTime: z.number().finite(),
+  rawVersion: z.number().int().positive(),
+});
+
+export const UpdateCleanupPreviewSchema = z.object({
+  latestLocalVersion: z.number().int().positive(),
+  keepFiles: z.array(UpdateCleanupFileSchema).min(1),
+  deleteFiles: z.array(UpdateCleanupFileSchema).min(1),
+});
 
 export const MoveFileInputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('game'), gameId: positiveInt, destinationFolder: z.string().min(1) }),

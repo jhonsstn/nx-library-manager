@@ -6,6 +6,7 @@ import type {
   GameDetailsDto,
   GameFileDto,
   GameSummaryDto,
+  KnownDlcDto,
   PagedResult,
   ScreenshotDto,
   UpdateFileDto,
@@ -18,7 +19,7 @@ import type {
 } from '../../shared/contracts/api';
 import { appError } from '../../shared/errors/app-error';
 import { displayImageUrl } from '../platform/catalog-image';
-import { detectVersion } from '../scanner/filename-parser';
+import { detectVersion, dlcNameFromFilename, extractTitleId } from '../scanner/filename-parser';
 import { updateFileGroup } from '../scanner/classify-file';
 import {
   allGameTitles,
@@ -29,6 +30,7 @@ import {
   resetLibrary,
   setFavorite,
   setNeedsReview,
+  setHidden,
   type GameRecord,
 } from '../repositories/games.repository';
 import { baseFilesByGame, getBaseFile, listGameFiles, type GameFileRecord } from '../repositories/game-files.repository';
@@ -45,6 +47,7 @@ import {
 import { listScreenshots } from '../repositories/screenshots.repository';
 import type { VersionService } from './version.service';
 import { contentsForGame, type ContainedTitle } from '../repositories/title-catalog.repository';
+import { previewOldUpdates } from '../repositories/update-cleanup.repository';
 
 export interface CatalogServiceOptions {
   db: AppDatabase;
@@ -81,6 +84,7 @@ export class CatalogService {
       genre: input.genre ?? undefined,
       favoritesOnly: input.favoritesOnly,
       needsReview: input.needsReview,
+      hidden: input.hiddenOnly === true,
       sort: input.sort,
     });
     const baseFiles = baseFilesByGame(this.db);
@@ -116,10 +120,30 @@ export class CatalogService {
       }),
     );
 
-    const localDlcRows = (titleId ? this.db.prepare(`SELECT DISTINCT t.title_id FROM titles t
-      JOIN file_titles ft ON ft.title_id=t.id WHERE t.type='dlc' AND t.base_title_id=?`)
-      .all(titleId) : []) as Array<{ title_id: string }>;
+    const localDlcRows = (titleId ? this.db.prepare(`SELECT t.title_id, t.display_name, t.name_source,
+      lf.file_name FROM titles t JOIN file_titles ft ON ft.title_id=t.id
+      JOIN local_files lf ON lf.id=ft.local_file_id
+      WHERE t.type='dlc' AND t.base_title_id=? AND t.provisional=0 AND t.title_id IS NOT NULL
+      ORDER BY lf.file_name`).all(titleId) : []) as Array<{
+        title_id: string; display_name: string; name_source: string; file_name: string;
+      }>;
     const localDlcIds = new Set(localDlcRows.map((row) => row.title_id));
+    const baseName = contents.find((item) => item.type === 'base' && !item.provisional)?.name ?? record.displayTitle;
+    const knownDlc: KnownDlcDto[] = titleId ? this.versions.dlcIndex.forBase(titleId).map((entry) => {
+      const catalogName = entry.name && entry.name.toUpperCase() !== entry.titleId ? entry.name : null;
+      const local = localDlcRows.filter((row) => row.title_id === entry.titleId);
+      const packageName = local.find((row) => row.name_source === 'nacp'
+        && !sameTitleName(row.display_name, baseName))?.display_name;
+      const filenameName = local.map((row) => {
+        const embeddedId = extractTitleId(row.file_name);
+        return embeddedId && !row.file_name.toUpperCase().includes(entry.titleId)
+          ? null : dlcNameFromFilename(row.file_name);
+      }).find((name) => name !== null);
+      const name = catalogName ?? packageName ?? filenameName ?? entry.titleId;
+      const nameSource: KnownDlcDto['nameSource'] = catalogName ? 'titledb'
+        : packageName ? 'package' : filenameName ? 'filename' : 'title-id';
+      return { titleId: entry.titleId, name, nameSource, filePresent: localDlcIds.has(entry.titleId) };
+    }) : [];
     return {
       ...summary,
       description: record.description,
@@ -132,11 +156,9 @@ export class CatalogService {
       updates: updates.map((update) => toUpdateDto(update)),
       screenshots,
       versionStatus: this.verifiedVersionStatus(titleId, contents),
+      updateCleanup: previewOldUpdates(this.db, gameId),
       containedTitles: contents,
-      knownDlc: titleId ? this.versions.dlcIndex.forBase(titleId).map((entry) => ({
-        titleId: entry.titleId, name: entry.name ?? entry.titleId,
-        filePresent: localDlcIds.has(entry.titleId),
-      })) : [],
+      knownDlc,
       knownDlcRefreshedAt: this.versions.dlcIndex.refreshedAt,
       installed: this.versions.installedStatus({
         gameId,
@@ -160,6 +182,11 @@ export class CatalogService {
   setNeedsReview(gameId: number, value: boolean): void {
     this.requireGame(gameId);
     setNeedsReview(this.db, gameId, value);
+  }
+
+  setHidden(gameId: number, hidden: boolean): void {
+    this.requireGame(gameId);
+    setHidden(this.db, gameId, hidden);
   }
 
   /** Moves a game row out of the catalog and reclassifies its file as unmatched update/DLC. */
@@ -242,6 +269,7 @@ export class CatalogService {
       displayTitle: record.displayTitle,
       cleanedTitle: record.cleanedTitle,
       favorite: record.favorite,
+      hidden: record.hidden,
       needsReview: record.needsReview,
       metadataLocked: record.metadataLocked,
       metadataProvider: record.metadataProvider,
@@ -276,6 +304,11 @@ export class CatalogService {
 
 function verifiedBaseTitleId(contents: ContainedTitle[]): string {
   return contents.find((item) => item.type === 'base' && !item.provisional)?.titleId ?? '';
+}
+
+function sameTitleName(left: string, right: string): boolean {
+  const normalize = (value: string) => value.normalize('NFKD').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  return normalize(left) === normalize(right);
 }
 
 function verifiedPatchVersions(contents: ContainedTitle[], titleId: string): number[] {

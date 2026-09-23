@@ -9,7 +9,7 @@ import { TITLE_ID_MATCH_CONFIDENCE } from '@shared/constants';
 import type { ScanCompletedDto, ScanProgressDto } from '@shared/types/domain';
 import { closeDatabase, openDatabase, type AppDatabase } from '@main/db/database';
 import { runMigrations } from '@main/db/migrations';
-import { getGame, listGames, setFavorite } from '@main/repositories/games.repository';
+import { getGame, listGames, setFavorite, setHidden } from '@main/repositories/games.repository';
 import { listGameFiles, type GameFileRecord } from '@main/repositories/game-files.repository';
 import { assignManualMatch, listAllUpdates, type UpdateRecord } from '@main/repositories/updates.repository';
 import { ScannerService } from '@main/services/scanner.service';
@@ -107,7 +107,7 @@ function expectConsistentDatabase(): void {
   expect(countRows('SELECT COUNT(*) AS total FROM (SELECT file_path FROM game_files GROUP BY file_path HAVING COUNT(*) > 1)')).toBe(0);
   expect(countRows('SELECT COUNT(*) AS total FROM (SELECT file_path FROM updates GROUP BY file_path HAVING COUNT(*) > 1)')).toBe(0);
   expect(countRows('SELECT COUNT(*) AS total FROM game_files f LEFT JOIN games g ON g.id = f.game_id WHERE g.id IS NULL')).toBe(0);
-  expect(countRows('SELECT COUNT(*) AS total FROM games g WHERE NOT EXISTS (SELECT 1 FROM game_files f WHERE f.game_id = g.id)')).toBe(0);
+  expect(countRows('SELECT COUNT(*) AS total FROM games g WHERE g.hidden=0 AND NOT EXISTS (SELECT 1 FROM game_files f WHERE f.game_id = g.id)')).toBe(0);
   expect(countRows('SELECT COUNT(*) AS total FROM updates u LEFT JOIN games g ON g.id = u.game_id WHERE u.game_id IS NOT NULL AND g.id IS NULL')).toBe(0);
 }
 
@@ -223,6 +223,29 @@ describe('ScannerService', () => {
     expectConsistentDatabase();
   });
 
+  it('keeps hidden games hidden through rescans and temporary file removal', async () => {
+    await runScan({ baseFolder: baseDir, updatesFolder: updatesDir });
+    const alpha = gameByTitle('Alpha Game');
+    setHidden(db, alpha.id, true);
+
+    await runScan({ baseFolder: baseDir, updatesFolder: updatesDir });
+    expect(getGame(db, alpha.id)?.hidden).toBe(true);
+
+    unlinkSync(join(baseDir, ALPHA_BASE));
+    await runScan({ baseFolder: baseDir, updatesFolder: updatesDir });
+    expect(getGame(db, alpha.id)?.hidden).toBe(true);
+    expect(listGameFiles(db, alpha.id)).toHaveLength(0);
+    expectConsistentDatabase();
+
+    place(baseDir, ALPHA_BASE, Buffer.from('placeholder alpha base payload'));
+    await runScan({ baseFolder: baseDir, updatesFolder: updatesDir });
+    expect(gameByTitle('Alpha Game').id).toBe(alpha.id);
+    expect(getGame(db, alpha.id)?.hidden).toBe(true);
+    setHidden(db, alpha.id, false);
+    expect(getGame(db, alpha.id)?.hidden).toBe(false);
+    expectConsistentDatabase();
+  });
+
   it('drops rows for deleted files and keeps rows outside the scanned roots', async () => {
     const otherRoot = join(workdir, 'other-library');
     place(otherRoot, 'Elsewhere Game [0100000000030000][v0].nsp', Buffer.from('placeholder elsewhere payload'));
@@ -246,6 +269,7 @@ describe('ScannerService', () => {
     await runScan({ baseFolder: baseDir, updatesFolder: updatesDir });
     const alpha = gameByTitle('Alpha Game');
     setFavorite(db, alpha.id, true);
+    setHidden(db, alpha.id, true);
     db.prepare('UPDATE games SET description = ? WHERE id = ?').run('discarded by reset', alpha.id);
     assignManualMatch(db, [updateByName(ORPHAN_UPDATE).id], alpha.id);
 
@@ -253,6 +277,7 @@ describe('ScannerService', () => {
 
     const rescanned = gameByTitle('Alpha Game');
     expect(rescanned.favorite).toBe(false);
+    expect(rescanned.hidden).toBe(false);
     expect(rescanned.description).toBe('');
     expect(listAllUpdates(db).every((update) => !update.manualMatch)).toBe(true);
     expect(updateByName(ORPHAN_UPDATE).gameId).toBeNull();

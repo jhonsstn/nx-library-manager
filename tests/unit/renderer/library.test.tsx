@@ -72,6 +72,7 @@ function summary(overrides: Partial<GameSummaryDto> = {}): GameSummaryDto {
     displayTitle: 'Zelda',
     cleanedTitle: 'Zelda',
     favorite: false,
+    hidden: false,
     needsReview: false,
     metadataLocked: false,
     metadataProvider: 'igdb',
@@ -114,6 +115,38 @@ function renderLibrary(handlers: Record<string, (args: unknown[]) => unknown>) {
 }
 
 describe('LibraryPage', () => {
+  it('hides a game and restores it from the hidden view', async () => {
+    const user = userEvent.setup();
+    let hidden = false;
+    const setHidden = vi.fn((args: unknown[]) => { hidden = args[1] as boolean; });
+    const listGames = vi.fn((args: unknown[]) => {
+      const hiddenOnly = (args[0] as ListGamesInput).hiddenOnly === true;
+      const items = hiddenOnly === hidden ? [summary({ hidden })] : [];
+      return { items, total: items.length };
+    });
+    renderLibrary({
+      [IPC.catalog.listGames]: listGames,
+      [IPC.catalog.getGenres]: () => [],
+      [IPC.catalog.getGame]: () => details({ hidden }),
+      [IPC.catalog.setHidden]: setHidden,
+    });
+
+    await user.click(await screen.findByRole('option', { name: 'Zelda' }));
+    await user.click(await screen.findByRole('button', { name: 'Hide from library' }));
+    expect(setHidden).toHaveBeenCalledWith([1, true]);
+    await waitFor(() => expect(screen.queryByRole('option', { name: 'Zelda' })).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('checkbox', { name: 'Hidden games only' }));
+    await waitFor(() => expect(listGames).toHaveBeenCalledWith([expect.objectContaining({ hiddenOnly: true })]));
+    fireEvent.contextMenu(await screen.findByRole('option', { name: 'Zelda' }));
+    await user.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Restore to library' }));
+    expect(setHidden).toHaveBeenCalledWith([1, false]);
+    await waitFor(() => expect(screen.queryByRole('option', { name: 'Zelda' })).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('checkbox', { name: 'Hidden games only' }));
+    expect(await screen.findByRole('option', { name: 'Zelda' })).toBeInTheDocument();
+  });
+
   it('lists catalog games and offers the sorted genre choices', async () => {
     const listGames = vi.fn(() => ({ items: [summary(), summary({ id: 2, displayTitle: 'Metroid' })], total: 2 }));
     renderLibrary({
@@ -252,6 +285,7 @@ describe('LibraryPage', () => {
       'Search/change metadata match',
       'Favorite game',
       'Mark as DLC/update',
+      'Hide from library',
       'Export catalog backup',
       'Delete game file from disk',
     ]) {

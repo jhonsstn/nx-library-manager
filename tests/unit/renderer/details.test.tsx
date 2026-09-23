@@ -90,6 +90,7 @@ const SUMMARY: GameSummaryDto = {
   displayTitle: 'Zelda',
   cleanedTitle: 'Zelda',
   favorite: false,
+  hidden: false,
   needsReview: false,
   metadataLocked: true,
   metadataProvider: 'igdb',
@@ -130,6 +131,29 @@ function renderPane(handlers: Record<string, (args: unknown[]) => unknown>) {
 }
 
 describe('GameDetailsPane', () => {
+  it('reviews older tracked patches before cleaning them', async () => {
+    const user = userEvent.setup();
+    const cleanOldUpdates = vi.fn(() => ({ deletedFiles: 1, freedBytes: 100 }));
+    const preview = {
+      latestLocalVersion: 131072,
+      keepFiles: [{ filePath: 'D:\\updates\\latest.nsp', fileName: 'latest.nsp',
+        fileSize: 200, modifiedTime: 2, rawVersion: 131072 }],
+      deleteFiles: [{ filePath: 'D:\\updates\\old.nsp', fileName: 'old.nsp',
+        fileSize: 100, modifiedTime: 1, rawVersion: 65536 }],
+    };
+    renderPane({
+      [IPC.catalog.getGame]: () => details({ updateCleanup: preview }),
+      [IPC.files.cleanOldUpdates]: cleanOldUpdates,
+    });
+    await user.click(await screen.findByRole('button', { name: 'Clean older updates' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Clean older updates' });
+    expect(confirm).toHaveTextContent('latest.nsp');
+    expect(confirm).toHaveTextContent('old.nsp');
+    expect(cleanOldUpdates).not.toHaveBeenCalled();
+    await user.click(within(confirm).getByRole('button', { name: 'Delete older updates' }));
+    await waitFor(() => expect(cleanOldUpdates).toHaveBeenCalledWith([1, preview]));
+  });
+
   it('shows the game summary while keeping long descriptions and paths collapsed', async () => {
     const user = userEvent.setup();
     renderPane({
@@ -173,8 +197,9 @@ describe('GameDetailsPane', () => {
           provisional: false, inspectionError: null,
         }],
         knownDlc: [
-          { titleId: '0100AABBCCDD1001', name: 'Present pack', filePresent: true },
-          { titleId: '0100AABBCCDD1002', name: 'Missing pack', filePresent: false },
+          { titleId: '0100AABBCCDD1001', name: 'Present pack', nameSource: 'filename', filePresent: true },
+          { titleId: '0100AABBCCDD1002', name: 'Missing pack', nameSource: 'titledb', filePresent: false },
+          { titleId: '0100AABBCCDD1003', name: '0100AABBCCDD1003', nameSource: 'title-id', filePresent: false },
         ],
         knownDlcRefreshedAt: '2026-09-23T00:00:00Z',
         versionStatus: {
@@ -188,9 +213,11 @@ describe('GameDetailsPane', () => {
 
     expect(await screen.findByText('Update file missing')).toBeVisible();
     expect(screen.getByText(/Missing v131072 .* TitleDB/)).toBeVisible();
-    expect(screen.getByText('2 listed · 1 file missing')).toBeVisible();
+    expect(screen.getByText('3 listed · 2 files missing')).toBeVisible();
     expect(screen.getByText('Missing pack')).toBeVisible();
     expect(screen.getByText('Present pack')).toBeVisible();
+    expect(screen.getByText('0100AABBCCDD1001 · Filename')).toBeVisible();
+    expect(screen.getByText('Name unavailable')).toBeVisible();
     expect(screen.getByText('Verified cnmt · D:\\games\\Zelda.nsp')).not.toBeVisible();
   });
 

@@ -7,6 +7,7 @@ export const IPC = {
     getGenres: 'catalog:getGenres',
     setFavorite: 'catalog:setFavorite',
     setNeedsReview: 'catalog:setNeedsReview',
+    setHidden: 'catalog:setHidden',
     markAsUpdate: 'catalog:markAsUpdate',
     assignUpdates: 'catalog:assignUpdates',
     unmatchUpdates: 'catalog:unmatchUpdates',
@@ -29,6 +30,7 @@ export const IPC = {
   files: {
     chooseDirectory: 'files:chooseDirectory',
     deleteFile: 'files:deleteFile',
+    cleanOldUpdates: 'files:cleanOldUpdates',
     moveFile: 'files:moveFile',
   },
   install: {

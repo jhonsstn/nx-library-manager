@@ -9,6 +9,7 @@ import {
   ListGamesInputSchema,
   ListUpdatesInputSchema,
   MoveFileInputSchema,
+  UpdateCleanupPreviewSchema,
   UnmatchUpdatesInputSchema,
 } from '../../shared/schemas/inputs';
 import { appError } from '../../shared/errors/app-error';
@@ -26,6 +27,9 @@ export function registerCatalogIpc(deps: IpcDeps): void {
   );
   handle(IPC.catalog.setNeedsReview, z.tuple([GameIdSchema, z.boolean()]), (gameId, value) =>
     deps.catalog.setNeedsReview(gameId, value),
+  );
+  handle(IPC.catalog.setHidden, z.tuple([GameIdSchema, z.boolean()]), (gameId, hidden) =>
+    deps.catalog.setHidden(gameId, hidden),
   );
   handle(IPC.catalog.markAsUpdate, z.tuple([GameIdSchema]), (gameId) => deps.catalog.markAsUpdate(gameId));
   handle(IPC.catalog.assignUpdates, z.tuple([AssignUpdatesInputSchema]), (input) => deps.catalog.assignUpdates(input));
@@ -61,6 +65,8 @@ export function registerFilesIpc(deps: IpcDeps): void {
     chooseDirectory(deps, input),
   );
   handle(IPC.files.deleteFile, z.tuple([DeleteFileInputSchema]), (input) => deps.files.deleteTrackedFile(input));
+  handle(IPC.files.cleanOldUpdates, z.tuple([GameIdSchema, UpdateCleanupPreviewSchema]),
+    (gameId, preview) => deps.files.cleanOldUpdates(gameId, preview));
   handle(IPC.files.moveFile, z.tuple([MoveFileInputSchema]), (input) => deps.files.moveTrackedFile(input));
 }
 

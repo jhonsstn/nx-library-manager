@@ -110,7 +110,8 @@ test('search filters the library and details show the matched update', async () 
   await gameRow('Hades').click();
   await expect(page.getByText('Hades.nsp').first()).toBeVisible();
   await expect(page.getByText(/Update status unknown/)).toBeVisible();
-  await expect(page.getByText(/Hades \[v131072\].nsp/).first()).toBeVisible();
+  await expect(page.getByRole('listbox', { name: 'DLC and updates' })
+    .getByRole('option', { name: /^Hades \[v131072\]\.nsp/ })).toBeVisible();
 });
 
 test('favorites persist across a restart, and the DBI server starts and stops', async () => {

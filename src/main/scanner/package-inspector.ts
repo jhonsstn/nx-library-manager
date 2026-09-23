@@ -1,9 +1,9 @@
-import { createDecipheriv } from 'node:crypto';
+import { createCipheriv, createDecipheriv } from 'node:crypto';
 import { open, type FileHandle } from 'node:fs/promises';
 import { extname } from 'node:path';
 import { zstdDecompressSync } from 'node:zlib';
 
-export const INSPECTOR_VERSION = 3;
+export const INSPECTOR_VERSION = 5;
 const MAX_HEADER = 16 * 1024 * 1024;
 const MAX_ENTRIES = 10_000;
 const ID = /^[0-9A-F]{16}$/;
@@ -93,17 +93,34 @@ function decryptNcaHeader(data: Buffer, key: Buffer): Buffer | null {
     try {
       const header = Buffer.alloc(0xC00);
       for (let sector = 0; sector < 6; sector += 1) {
-        const tweak = Buffer.alloc(16);
-        if (littleEndian) tweak.writeUInt32LE(sector, 0);
-        else tweak.writeUInt32BE(sector, 12);
-        const decipher = createDecipheriv('aes-128-xts', key, tweak);
-        const plain = Buffer.concat([decipher.update(data.subarray(sector * 0x200, (sector + 1) * 0x200)), decipher.final()]);
-        plain.copy(header, sector * 0x200);
+        const sectorNumber = Buffer.alloc(16);
+        if (littleEndian) sectorNumber.writeUInt32LE(sector, 0);
+        else sectorNumber.writeUInt32BE(sector, 12);
+        const tweak = encryptEcb(key.subarray(16), sectorNumber);
+        for (let at = sector * 0x200; at < (sector + 1) * 0x200; at += 16) {
+          const masked = Buffer.alloc(16);
+          for (let i = 0; i < 16; i += 1) masked[i] = data[at + i] ^ tweak[i];
+          const plain = decryptEcb(key.subarray(0, 16), masked);
+          for (let i = 0; i < 16; i += 1) header[at + i] = plain[i] ^ tweak[i];
+          let carry = 0;
+          for (let i = 0; i < 16; i += 1) {
+            const next = tweak[i] >>> 7;
+            tweak[i] = ((tweak[i] << 1) & 0xFF) | carry;
+            carry = next;
+          }
+          if (carry) tweak[0] ^= 0x87;
+        }
       }
       if (/^NCA[0-3]$/.test(header.toString('ascii', 0x200, 0x204))) return header;
     } catch { /* unsupported key or malformed header */ }
   }
   return null;
+}
+
+function encryptEcb(key: Buffer, value: Buffer): Buffer {
+  const cipher = createCipheriv('aes-128-ecb', key, null);
+  cipher.setAutoPadding(false);
+  return Buffer.concat([cipher.update(value), cipher.final()]);
 }
 
 function decryptEcb(key: Buffer, value: Buffer): Buffer {

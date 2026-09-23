@@ -128,7 +128,8 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
     : details.versionStatus.kind === 'update-available' ? 'Newer update available'
       : details.versionStatus.kind === 'current' ? 'Latest update file present'
         : details.versionStatus.kind === 'local-newer' ? 'Local file newer than catalog'
-          : 'Update status unknown';
+          : details.versionStatus.kind === 'loading' ? 'Checking update data'
+            : 'Update status unknown';
   const knownDlc = [...(details.knownDlc ?? [])].sort((a, b) => Number(a.filePresent) - Number(b.filePresent));
   const missingDlcCount = knownDlc.filter((item) => !item.filePresent).length;
 
@@ -237,12 +238,19 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
             <span className="details__title-id">Title ID: {details.titleId ?? 'Unknown (provisional)'}</span>
           </div>
           <div className={`details__update-card details__update-card--${statusTone}`} role="status">
-            <strong>{statusHeading}</strong>
+            {details.versionStatus.kind === 'loading' ? (
+              <div className="details__update-loading">
+                <span className="spinner" aria-hidden="true" />
+                <strong>{statusHeading}</strong>
+              </div>
+            ) : <strong>{statusHeading}</strong>}
             {missingUpdate ? (
               <>
                 <span>Missing {releasedVersionLabel(missingUpdate.version, missingUpdate.releaseDate)} · TitleDB</span>
                 <span>Latest on file: {versionLabel(localVersion)}</span>
               </>
+            ) : details.versionStatus.kind === 'loading' ? (
+              <span>Downloading TitleDB update and DLC data. The first check may take a few minutes.</span>
             ) : details.versionStatus.kind === 'unknown' || details.versionStatus.kind === 'missing-local-version' ? (
               <span>{details.versionStatus.uncertainty ?? 'Insufficient metadata to compare updates.'}</span>
             ) : (

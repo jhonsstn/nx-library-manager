@@ -188,6 +188,26 @@ describe('CatalogService.getGame', () => {
       .toMatchObject({ name:'0100000000011001',nameSource:'title-id',filePresent:false });
   });
 
+  it('shows a loading state while a verified game waits for the first TitleDB index', async () => {
+    const dir = mkdtempSync(join(TEMP_ROOT, 'pending-index-'));
+    const pendingPaths = resolveAppPaths(dir, dir);
+    ensureAppPaths(pendingPaths);
+    writeFileSync(pendingPaths.versionsJsonFile, JSON.stringify({
+      [TITLE_ID]: { '131072': '2021-01-01' },
+    }));
+    writeFileSync(pendingPaths.versionsTxtFile, 'id|name|version\n');
+    const pendingVersions = new VersionService({ db, paths: pendingPaths });
+    await pendingVersions.load();
+    const pendingCatalog = new CatalogService({
+      db, versions: pendingVersions, settings: () => defaultAppSettings(),
+    });
+
+    expect(pendingCatalog.getGame(2).versionStatus).toMatchObject({
+      kind: 'loading', missingUpdate: null,
+    });
+    expect(pendingCatalog.getGame(1).versionStatus.kind).toBe('unknown');
+  });
+
   it('uses a matching local DLC filename when TitleDB has no name', () => {
     const name = 'Zelda [DLC Hero Costume] [0100000000011001][v0].nsp';
     recordInspection(db, {

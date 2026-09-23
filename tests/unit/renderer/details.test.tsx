@@ -221,6 +221,22 @@ describe('GameDetailsPane', () => {
     expect(screen.getByText('Verified cnmt · D:\\games\\Zelda.nsp')).not.toBeVisible();
   });
 
+  it('shows TitleDB loading instead of an unavailable index message', async () => {
+    renderPane({
+      [IPC.catalog.getGame]: () => details({
+        versionStatus: {
+          kind: 'loading', localVersion: 65536, latest: null, newer: [],
+          missingUpdate: null, uncertainty: 'TitleDB title-type index is unavailable.',
+        },
+      }),
+    });
+
+    expect(await screen.findByText('Checking update data')).toBeVisible();
+    expect(screen.getByText(/Downloading TitleDB update and DLC data/)).toBeVisible();
+    expect(screen.queryByText('Update status unknown')).not.toBeInTheDocument();
+    expect(screen.queryByText('TitleDB title-type index is unavailable.')).not.toBeInTheDocument();
+  });
+
   it('groups the DLC and update files and installs the current selection', async () => {
     const user = userEvent.setup();
     renderPane({ [IPC.catalog.getGame]: () => details() });

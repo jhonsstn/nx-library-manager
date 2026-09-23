@@ -26,6 +26,7 @@ export interface ListGamesInput {
   favoritesOnly?: boolean;
   needsReview?: boolean;
   needsUpdate?: boolean;
+  hiddenOnly?: boolean;
   sort?: 'title-asc' | 'title-desc' | 'added-desc';
   limit?: number;
   offset?: number;
@@ -82,6 +83,7 @@ export interface SwitchCatalogApi {
     getGenres(): Promise<string[]>;
     setFavorite(gameId: number, favorite: boolean): Promise<void>;
     setNeedsReview(gameId: number, value: boolean): Promise<void>;
+    setHidden(gameId: number, hidden: boolean): Promise<void>;
     markAsUpdate(gameId: number): Promise<void>;
     assignUpdates(input: AssignUpdatesInput): Promise<void>;
     unmatchUpdates(updateIds: number[]): Promise<void>;

@@ -28,6 +28,9 @@ export function registerCatalogIpc(deps: IpcDeps): void {
   handle(IPC.catalog.setNeedsReview, z.tuple([GameIdSchema, z.boolean()]), (gameId, value) =>
     deps.catalog.setNeedsReview(gameId, value),
   );
+  handle(IPC.catalog.setHidden, z.tuple([GameIdSchema, z.boolean()]), (gameId, hidden) =>
+    deps.catalog.setHidden(gameId, hidden),
+  );
   handle(IPC.catalog.markAsUpdate, z.tuple([GameIdSchema]), (gameId) => deps.catalog.markAsUpdate(gameId));
   handle(IPC.catalog.assignUpdates, z.tuple([AssignUpdatesInputSchema]), (input) => deps.catalog.assignUpdates(input));
   handle(IPC.catalog.unmatchUpdates, z.tuple([UnmatchUpdatesInputSchema]), (updateIds) =>

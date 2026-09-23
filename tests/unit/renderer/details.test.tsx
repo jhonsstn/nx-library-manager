@@ -90,6 +90,7 @@ const SUMMARY: GameSummaryDto = {
   displayTitle: 'Zelda',
   cleanedTitle: 'Zelda',
   favorite: false,
+  hidden: false,
   needsReview: false,
   metadataLocked: true,
   metadataProvider: 'igdb',

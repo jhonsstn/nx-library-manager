@@ -15,6 +15,8 @@ export interface LibraryFiltersProps {
   onNeedsReviewChange: (value: boolean) => void;
   needsUpdate: boolean;
   onNeedsUpdateChange: (value: boolean) => void;
+  showHidden: boolean;
+  onShowHiddenChange: (value: boolean) => void;
   scanProgress: ScanProgressDto | null;
   scanning: boolean;
   onRescan: () => void;
@@ -46,6 +48,8 @@ export function LibraryFilters({
   onNeedsReviewChange,
   needsUpdate,
   onNeedsUpdateChange,
+  showHidden,
+  onShowHiddenChange,
   scanProgress,
   scanning,
   onRescan,
@@ -99,6 +103,14 @@ export function LibraryFilters({
             onChange={(event) => onNeedsUpdateChange(event.target.checked)}
           />
           Needs Update?
+        </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={showHidden}
+            onChange={(event) => onShowHiddenChange(event.target.checked)}
+          />
+          Hidden games only
         </label>
         <span className="toolbar__spacer" />
         <Button onClick={onRescan} disabled={scanning}>

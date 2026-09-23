@@ -9,6 +9,7 @@ export const ListGamesInputSchema = z.object({
   favoritesOnly: z.boolean().optional(),
   needsReview: z.boolean().optional(),
   needsUpdate: z.boolean().optional(),
+  hiddenOnly: z.boolean().optional(),
   sort: z.enum(['title-asc', 'title-desc', 'added-desc']).optional(),
   limit: positiveInt.max(10_000).optional(),
   offset: z.number().int().nonnegative().optional(),

@@ -102,6 +102,17 @@ export function useSetNeedsReview() {
   });
 }
 
+export function useSetHidden() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ gameId, hidden }: { gameId: number; hidden: boolean }) =>
+      getCatalogApi().catalog.setHidden(gameId, hidden),
+    onSuccess: async () => {
+      for (const key of catalogKeysToInvalidate()) await queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
 export function useMarkAsUpdate() {
   const queryClient = useQueryClient();
   return useMutation({

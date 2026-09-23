@@ -82,6 +82,7 @@ export function createSwitchCatalogApi(bridge: IpcBridge): SwitchCatalogApi {
       getGenres: () => call<string[]>(IPC.catalog.getGenres),
       setFavorite: (gameId, favorite) => call<void>(IPC.catalog.setFavorite, [gameId, favorite]),
       setNeedsReview: (gameId, value) => call<void>(IPC.catalog.setNeedsReview, [gameId, value]),
+      setHidden: (gameId, hidden) => call<void>(IPC.catalog.setHidden, [gameId, hidden]),
       markAsUpdate: (gameId) => call<void>(IPC.catalog.markAsUpdate, [gameId]),
       assignUpdates: (input) => call<void>(IPC.catalog.assignUpdates, [input]),
       unmatchUpdates: (updateIds) => call<void>(IPC.catalog.unmatchUpdates, [updateIds]),

@@ -229,7 +229,7 @@ function pruneMissingFiles(db: AppDatabase): void {
     for (const file of listGameFiles(db, game.id)) {
       if (!existsSync(file.filePath)) deleteGameFile(db, file.id);
     }
-    if (listGameFiles(db, game.id).length === 0) emptyGameIds.push(game.id);
+    if (listGameFiles(db, game.id).length === 0 && !game.hidden) emptyGameIds.push(game.id);
   }
   deleteGames(db, emptyGameIds);
 

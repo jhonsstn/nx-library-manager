@@ -9,7 +9,7 @@ import { EmptyState, ErrorText, Skeleton } from '@renderer/components/Feedback';
 import { ConfirmDialog } from '@renderer/components/Modal';
 import { useToast } from '@renderer/components/Toast';
 import { useSelection } from '@renderer/app/SelectionProvider';
-import { useExportBackup, useGames, useMarkAsUpdate, useSetFavorite } from '@renderer/query/hooks';
+import { useExportBackup, useGames, useMarkAsUpdate, useSetFavorite, useSetHidden } from '@renderer/query/hooks';
 
 /** Art slider bounds, matching `ui._grid_tab`'s QSlider range. */
 export const MIN_ART_SIZE = 110;
@@ -52,6 +52,7 @@ export function GameGrid({ favoritesOnly = false, artSize = DEFAULT_ART_SIZE }: 
   const navigate = useNavigate();
   const toast = useToast();
   const setFavorite = useSetFavorite();
+  const setHidden = useSetHidden();
   const markAsUpdate = useMarkAsUpdate();
   const exportBackup = useExportBackup();
   const { open: openMenu, element: menuElement } = useContextMenu();
@@ -114,6 +115,16 @@ export function GameGrid({ favoritesOnly = false, artSize = DEFAULT_ART_SIZE }: 
       onSelect: () => toggleFavorite(game),
     },
     { label: 'Mark as DLC/update', onSelect: () => setMarkTarget(game) },
+    {
+      label: 'Hide from library',
+      onSelect: () => setHidden.mutate({ gameId: game.id, hidden: true }, {
+        onSuccess: () => {
+          if (selectedGameId === game.id) selectGame(null);
+          toast.success('Game hidden', game.displayTitle);
+        },
+        onError: (error) => toast.error('Could not hide the game', errorMessage(error)),
+      }),
+    },
     { label: 'Export catalog backup', separatorBefore: true, onSelect: () => void runExportBackup() },
   ];
 

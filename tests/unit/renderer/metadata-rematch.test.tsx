@@ -22,6 +22,7 @@ const GAME: GameDetailsDto = {
   displayTitle: 'Hollow Knight',
   cleanedTitle: 'Hollow Knight',
   favorite: false,
+  hidden: false,
   needsReview: false,
   metadataLocked: false,
   metadataProvider: null,

@@ -21,6 +21,7 @@ export interface GameRow {
   metadata_locked: number;
   needs_review: number;
   favorite: number;
+  hidden: number;
 }
 
 export interface GameRecord {
@@ -42,6 +43,7 @@ export interface GameRecord {
   metadataLocked: boolean;
   needsReview: boolean;
   favorite: boolean;
+  hidden: boolean;
 }
 
 export interface GameListFilter {
@@ -49,6 +51,7 @@ export interface GameListFilter {
   genre?: string | null;
   favoritesOnly?: boolean;
   needsReview?: boolean;
+  hidden?: boolean;
   sort?: 'title-asc' | 'title-desc' | 'added-desc';
   limit?: number;
   offset?: number;
@@ -57,7 +60,7 @@ export interface GameListFilter {
 const GAME_COLUMNS =
   'id, display_title, cleaned_title, metadata_provider, metadata_provider_id, description, release_date, ' +
   'developer, publisher, genres, cover_image_path, cover_image_url, trailer_url, date_added, last_scanned, ' +
-  'metadata_locked, needs_review, favorite';
+  'metadata_locked, needs_review, favorite, hidden';
 
 /** Parses the JSON-encoded `genres` column, tolerating legacy/BLOB junk. */
 export function parseGenres(value: unknown): string[] {
@@ -90,6 +93,7 @@ export function toGameRecord(row: GameRow): GameRecord {
     metadataLocked: row.metadata_locked === 1,
     needsReview: row.needs_review === 1,
     favorite: row.favorite === 1,
+    hidden: row.hidden === 1,
   };
 }
 
@@ -107,6 +111,7 @@ function buildWhere(filter: GameListFilter): { clause: string; args: unknown[] }
   }
   if (filter.favoritesOnly) conditions.push('g.favorite = 1');
   if (filter.needsReview) conditions.push('(g.metadata_provider IS NULL OR g.needs_review = 1)');
+  if (filter.hidden !== undefined) conditions.push(`g.hidden = ${filter.hidden ? 1 : 0}`);
   return {
     clause: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '',
     args,
@@ -165,6 +170,10 @@ export function setFavorite(db: AppDatabase, gameId: number, favorite: boolean):
 
 export function setNeedsReview(db: AppDatabase, gameId: number, value: boolean): void {
   db.prepare('UPDATE games SET needs_review = ? WHERE id = ?').run(value ? 1 : 0, gameId);
+}
+
+export function setHidden(db: AppDatabase, gameId: number, hidden: boolean): void {
+  db.prepare('UPDATE games SET hidden = ? WHERE id = ?').run(hidden ? 1 : 0, gameId);
 }
 
 /** Scan reconciliation: creates the game row when the cleaned title is new. */

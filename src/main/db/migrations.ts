@@ -187,7 +187,18 @@ const titleCatalog: Migration = {
   },
 };
 
-export const MIGRATIONS: Migration[] = [initialSchema, titleCatalog];
+const hiddenGames: Migration = {
+  version: 3,
+  name: 'hidden-games',
+  up: (db) => {
+    db.exec(`
+      ALTER TABLE games ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;
+      CREATE INDEX idx_games_hidden ON games(hidden);
+    `);
+  },
+};
+
+export const MIGRATIONS: Migration[] = [initialSchema, titleCatalog, hiddenGames];
 
 export function appliedVersions(db: AppDatabase): number[] {
   db.exec(`

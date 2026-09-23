@@ -32,6 +32,7 @@ function game(id: number, displayTitle: string, overrides: Partial<GameSummaryDt
     displayTitle,
     cleanedTitle: displayTitle,
     favorite: false,
+    hidden: false,
     needsReview: false,
     metadataLocked: false,
     metadataProvider: 'igdb',
@@ -141,10 +142,24 @@ describe('GridPage', () => {
     const menu = await screen.findByRole('menu');
     expect(within(menu).getByRole('menuitem', { name: 'Open in library' })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: 'Mark as DLC/update' })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'Hide from library' })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: 'Export catalog backup' })).toBeInTheDocument();
 
     await user.click(within(menu).getByRole('menuitem', { name: 'Favorite game' }));
     expect(setFavorite).toHaveBeenCalledWith([1, true]);
+  });
+
+  it('hides a game from the grid context menu', async () => {
+    const user = userEvent.setup();
+    const setHidden = vi.fn(() => undefined);
+    renderGrid('grid', {
+      [IPC.catalog.listGames]: () => ({ items: [game(1, 'Zelda')], total: 1 }),
+      [IPC.settings.get]: () => ({ gridCoverSize: 170 }),
+      [IPC.catalog.setHidden]: setHidden,
+    });
+    fireEvent.contextMenu(await screen.findByRole('button', { name: 'Zelda' }));
+    await user.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Hide from library' }));
+    expect(setHidden).toHaveBeenCalledWith([1, true]);
   });
 });
 

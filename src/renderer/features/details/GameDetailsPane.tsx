@@ -21,6 +21,7 @@ import {
   useGame,
   useSetFavorite,
   useSetNeedsReview,
+  useSetHidden,
   useUnmatchUpdates,
 } from '@renderer/query/hooks';
 import { ScreenshotViewer } from './ScreenshotViewer';
@@ -28,6 +29,7 @@ import { TrailerDialog } from './TrailerDialog';
 
 export interface GameDetailsPaneProps {
   gameId: number;
+  onVisibilityChange?: () => void;
 }
 
 /** Group order used by `ui.load_game` when it buckets updates by file name. */
@@ -57,11 +59,12 @@ function compactFileName(fileName: string): string {
  * version status, description, the grouped DLC/update list with multi-select,
  * install controls and the screenshot strip.
  */
-export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
+export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneProps) {
   const query = useGame(gameId);
   const toast = useToast();
   const setFavorite = useSetFavorite();
   const setNeedsReview = useSetNeedsReview();
+  const setHidden = useSetHidden();
   const unmatchUpdates = useUnmatchUpdates();
   const deleteFile = useFileMutations().deleteFile;
   const cleanOldUpdates = useFileMutations().cleanOldUpdates;
@@ -150,6 +153,16 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
     );
   };
 
+  const toggleHidden = () => {
+    setHidden.mutate({ gameId: details.id, hidden: !details.hidden }, {
+      onSuccess: () => {
+        toast.success(details.hidden ? 'Game restored' : 'Game hidden', details.displayTitle);
+        onVisibilityChange?.();
+      },
+      onError: (error) => toast.error('Could not change game visibility', errorMessage(error)),
+    });
+  };
+
   const openUpdatesMenu = (event: MouseEvent<HTMLElement>, updateId: number) => {
     const ids = selectedUpdateIds.includes(updateId) ? selectedUpdateIds : [updateId];
     setSelectedUpdateIds(ids);
@@ -220,6 +233,7 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
           </p>
           <div className="details__identity">
             <span className="badge">{details.metadataProvider?.toUpperCase() ?? 'Local metadata'}</span>
+            {details.hidden ? <span className="badge">Hidden</span> : null}
             <span className="details__title-id">Title ID: {details.titleId ?? 'Unknown (provisional)'}</span>
           </div>
           <div className={`details__update-card details__update-card--${statusTone}`} role="status">
@@ -249,6 +263,9 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
             <Button onClick={toggleFavorite}>{details.favorite ? 'Remove favorite' : 'Favorite game'}</Button>
             <Button onClick={toggleNeedsReview}>
               {details.needsReview ? 'Clear needs review' : 'Mark as needs review'}
+            </Button>
+            <Button onClick={toggleHidden} disabled={setHidden.isPending}>
+              {details.hidden ? 'Restore to library' : 'Hide from library'}
             </Button>
             {details.trailerUrl ? <Button onClick={() => setTrailerOpen(true)}>Trailer</Button> : null}
           </div>

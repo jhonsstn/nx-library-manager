@@ -128,6 +128,7 @@ export interface GameSummaryDto {
   displayTitle: string;
   cleanedTitle: string;
   favorite: boolean;
+  hidden: boolean;
   needsReview: boolean;
   metadataLocked: boolean;
   metadataProvider: string | null;

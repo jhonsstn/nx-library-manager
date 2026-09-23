@@ -29,6 +29,7 @@ import {
   resetLibrary,
   setFavorite,
   setNeedsReview,
+  setHidden,
   type GameRecord,
 } from '../repositories/games.repository';
 import { baseFilesByGame, getBaseFile, listGameFiles, type GameFileRecord } from '../repositories/game-files.repository';
@@ -82,6 +83,7 @@ export class CatalogService {
       genre: input.genre ?? undefined,
       favoritesOnly: input.favoritesOnly,
       needsReview: input.needsReview,
+      hidden: input.hiddenOnly === true,
       sort: input.sort,
     });
     const baseFiles = baseFilesByGame(this.db);
@@ -164,6 +166,11 @@ export class CatalogService {
     setNeedsReview(this.db, gameId, value);
   }
 
+  setHidden(gameId: number, hidden: boolean): void {
+    this.requireGame(gameId);
+    setHidden(this.db, gameId, hidden);
+  }
+
   /** Moves a game row out of the catalog and reclassifies its file as unmatched update/DLC. */
   markAsUpdate(gameId: number): void {
     const baseFile = getBaseFile(this.db, gameId);
@@ -244,6 +251,7 @@ export class CatalogService {
       displayTitle: record.displayTitle,
       cleanedTitle: record.cleanedTitle,
       favorite: record.favorite,
+      hidden: record.hidden,
       needsReview: record.needsReview,
       metadataLocked: record.metadataLocked,
       metadataProvider: record.metadataProvider,

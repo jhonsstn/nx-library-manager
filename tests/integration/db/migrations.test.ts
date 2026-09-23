@@ -16,10 +16,10 @@ describe('database migrations', () => {
     const db = openDatabase(file);
     try {
       const first = runMigrations(db, file);
-      expect(first.applied).toEqual([1, 2]);
+      expect(first.applied).toEqual([1, 2, 3]);
       expect(first.backupFile).toBeNull();
       expect(runMigrations(db, file).applied).toEqual([]);
-      expect(appliedVersions(db)).toEqual([1, 2]);
+      expect(appliedVersions(db)).toEqual([1, 2, 3]);
       expect(MIGRATIONS[0].name).toBe('initial-schema');
 
       const jobColumns = db.prepare('PRAGMA table_info(install_jobs)').all() as Array<{ name: string }>;
@@ -29,6 +29,8 @@ describe('database migrations', () => {
       for (const table of ['titles', 'local_files', 'file_titles']) {
         expect(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table)).toBeDefined();
       }
+      const gameColumns = db.prepare('PRAGMA table_info(games)').all() as Array<{ name: string }>;
+      expect(gameColumns.map((column) => column.name)).toContain('hidden');
     } finally {
       closeDatabase(db);
     }
@@ -49,6 +51,7 @@ describe('database migrations', () => {
         'idx_games_favorite',
         'idx_games_needs_review',
         'idx_games_display_title',
+        'idx_games_hidden',
         'idx_install_jobs_status',
       ]) {
         expect(names).toContain(index);
@@ -67,7 +70,7 @@ describe('database migrations', () => {
         runMigrations(db, file, [
           ...MIGRATIONS,
           {
-            version: 3,
+            version: 4,
             name: 'failing-migration',
             up: (database) => {
               database.exec('CREATE TABLE should_rollback(id INTEGER)');
@@ -77,7 +80,7 @@ describe('database migrations', () => {
         ]),
       ).toThrow('migration exploded');
 
-      expect(appliedVersions(db)).not.toContain(3);
+      expect(appliedVersions(db)).not.toContain(4);
       expect(db.prepare("SELECT name FROM sqlite_master WHERE name = 'should_rollback'").get()).toBeUndefined();
       expect(readdirSync(dirname(file)).filter((name) => name.includes('.pre-migration-'))).toHaveLength(1);
     } finally {
@@ -99,7 +102,7 @@ describe('database migrations', () => {
       db.prepare(`INSERT INTO screenshots(game_id,image_url) VALUES (41,'https://example.test/shot')`).run();
       db.prepare(`INSERT INTO install_jobs(game_id,source_path,destination_folder,destination_type,file_name,
         file_kind,status) VALUES (41,'/library/example.nsp','/dest','folder','example.nsp','base','completed')`).run();
-      expect(runMigrations(db,file).applied).toEqual([2]);
+      expect(runMigrations(db,file).applied).toEqual([2, 3]);
       expect(db.prepare('SELECT id,favorite,metadata_locked FROM games WHERE id=41').get())
         .toMatchObject({ id:41,favorite:1,metadata_locked:1 });
       expect(db.prepare('SELECT count(*) AS n FROM local_files').get()).toMatchObject({ n:2 });
@@ -107,6 +110,22 @@ describe('database migrations', () => {
       expect(db.prepare('SELECT count(*) AS n FROM screenshots WHERE game_id=41').get()).toMatchObject({ n:1 });
       expect(db.prepare('SELECT count(*) AS n FROM install_jobs WHERE game_id=41').get()).toMatchObject({ n:1 });
       expect(db.prepare('SELECT manual_match FROM updates WHERE game_id=41').get()).toMatchObject({ manual_match:1 });
+      expect(db.prepare('SELECT hidden FROM games WHERE id=41').get()).toMatchObject({ hidden:0 });
     } finally { closeDatabase(db); }
+  });
+
+  it('adds visibility to an existing title catalog without changing its game rows', () => {
+    const file = freshDatabasePath();
+    const db = openDatabase(file);
+    try {
+      runMigrations(db, file, MIGRATIONS.slice(0, 2));
+      db.prepare("INSERT INTO games(id,display_title,cleaned_title,favorite) VALUES (73,'Existing','existing',1)").run();
+      expect(runMigrations(db, file).applied).toEqual([3]);
+      expect(db.prepare('SELECT id,favorite,hidden FROM games WHERE id=73').get())
+        .toMatchObject({ id: 73, favorite: 1, hidden: 0 });
+      expect(readdirSync(dirname(file)).some((name) => name.includes('.pre-migration-'))).toBe(true);
+    } finally {
+      closeDatabase(db);
+    }
   });
 });

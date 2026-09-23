@@ -7,6 +7,7 @@ export const IPC = {
     getGenres: 'catalog:getGenres',
     setFavorite: 'catalog:setFavorite',
     setNeedsReview: 'catalog:setNeedsReview',
+    setHidden: 'catalog:setHidden',
     markAsUpdate: 'catalog:markAsUpdate',
     assignUpdates: 'catalog:assignUpdates',
     unmatchUpdates: 'catalog:unmatchUpdates',

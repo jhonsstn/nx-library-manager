@@ -194,6 +194,19 @@ describe('CatalogService.getGame', () => {
 });
 
 describe('CatalogService mutations', () => {
+  it('hides and restores games without deleting their files or metadata', () => {
+    const before = catalog.getGame(1);
+    catalog.setHidden(1, true);
+    expect(catalog.listGames().items.map((game) => game.id)).not.toContain(1);
+    expect(catalog.listGames({ hiddenOnly: true }).items.map((game) => game.id)).toContain(1);
+    expect(catalog.getGame(1)).toMatchObject({ hidden: true, description: before.description });
+    expect(getBaseFile(db, hadesBaseFileId)).not.toBeNull();
+
+    catalog.setHidden(1, false);
+    expect(catalog.listGames().items.map((game) => game.id)).toContain(1);
+    expect(catalog.listGames({ hiddenOnly: true }).total).toBe(0);
+  });
+
   it('toggles favorites and genre filters accordingly', () => {
     catalog.setFavorite(1, false);
     expect(catalog.listGames({ favoritesOnly: true }).total).toBe(0);

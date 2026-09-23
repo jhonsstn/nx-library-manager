@@ -76,6 +76,7 @@ export function GameList({
           >
             <span className="list__title">{game.displayTitle}</span>
             <span className="library-row__badges">
+              {game.hidden ? <span className="badge">Hidden</span> : null}
               {game.favorite ? (
                 <span className="badge badge--favorite" aria-label="Favorite">
                   ★ Favorite

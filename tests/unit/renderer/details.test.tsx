@@ -130,7 +130,8 @@ function renderPane(handlers: Record<string, (args: unknown[]) => unknown>) {
 }
 
 describe('GameDetailsPane', () => {
-  it('renders the cover, metadata, path, version and installed status', async () => {
+  it('shows the game summary while keeping long descriptions and paths collapsed', async () => {
+    const user = userEvent.setup();
     renderPane({
       [IPC.catalog.getGame]: () =>
         details({
@@ -146,20 +147,51 @@ describe('GameDetailsPane', () => {
 
     expect(await screen.findByRole('heading', { name: 'Zelda' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Zelda' })).toHaveAttribute('src', 'catalog-image://cover/1');
-    expect(
-      screen.getByText('Release: 2017-03-03 | Developer: Nintendo EPD | Publisher: Nintendo'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Genres: Adventure')).toBeInTheDocument();
-    expect(screen.getByText('NSP | 4.0 GB | D:\\games\\Zelda.nsp')).toBeInTheDocument();
-    const versionStatus = screen.getByText(/Latest Version on File: v65536/);
-    expect(versionStatus.textContent).toBe(
-      'Latest Version on File: v65536 (1.0.0)\nLatest Version Released: v131072 (2.0.0) (2024-05-01)',
-    );
-    expect(versionStatus).toHaveClass('details__status');
-    expect(screen.getByText('Newer Updates Available')).toBeInTheDocument();
-    expect(screen.getByText('v131072 (2.0.0) (2024-05-01)')).toBeInTheDocument();
+    expect(screen.getByText('2017-03-03 · Nintendo')).toBeInTheDocument();
+    expect(screen.getByText('Adventure · Developed by Nintendo EPD')).toBeInTheDocument();
+    expect(screen.getByText('Base file · NSP · 4.0 GB · Zelda.nsp')).toBeInTheDocument();
+    expect(screen.getByText('Newer update available')).toBeInTheDocument();
+    expect(screen.getByText('On file: v65536 (1.0.0) · Latest released: v131072 (2.0.0) (2024-05-01)')).toBeInTheDocument();
     expect(screen.getByText('Latest Installed: v65536 (1.0.0) | SD install')).toBeInTheDocument();
-    expect(screen.getByLabelText('Description')).toHaveTextContent('An open-air adventure.');
+    expect(screen.getByText('An open-air adventure.')).not.toBeVisible();
+    expect(screen.getByText('Base file: D:\\games\\Zelda.nsp')).not.toBeVisible();
+    await user.click(screen.getByText('About this game'));
+    expect(screen.getByText('An open-air adventure.')).toBeVisible();
+    await user.click(screen.getByText(/Package details/));
+    expect(screen.getByText('Base file: D:\\games\\Zelda.nsp')).toBeVisible();
+    expect(screen.getByText('Newer releases')).toBeVisible();
+    expect(screen.getByText('v131072 (2.0.0) (2024-05-01)')).toBeVisible();
+  });
+
+  it('keeps missing updates and DLC visible while package inventory stays collapsed', async () => {
+    renderPane({
+      [IPC.catalog.getGame]: () => details({
+        titleId: '0100AABBCCDD0000',
+        containedTitles: [{
+          titleId: '0100AABBCCDD0000', baseTitleId: '0100AABBCCDD0000', type: 'base',
+          name: 'Zelda', rawVersion: 0, source: 'cnmt', filePath: BASE_FILE.filePath,
+          provisional: false, inspectionError: null,
+        }],
+        knownDlc: [
+          { titleId: '0100AABBCCDD1001', name: 'Present pack', filePresent: true },
+          { titleId: '0100AABBCCDD1002', name: 'Missing pack', filePresent: false },
+        ],
+        knownDlcRefreshedAt: '2026-09-23T00:00:00Z',
+        versionStatus: {
+          kind: 'update-available', localVersion: 65536,
+          latest: { version: 131072, releaseDate: '2024-05-01' },
+          newer: [{ version: 131072, releaseDate: '2024-05-01' }],
+          missingUpdate: { version: 131072, releaseDate: '2024-05-01' },
+        },
+      }),
+    });
+
+    expect(await screen.findByText('Update file missing')).toBeVisible();
+    expect(screen.getByText(/Missing v131072 .* TitleDB/)).toBeVisible();
+    expect(screen.getByText('2 listed · 1 file missing')).toBeVisible();
+    expect(screen.getByText('Missing pack')).toBeVisible();
+    expect(screen.getByText('Present pack')).toBeVisible();
+    expect(screen.getByText('Verified cnmt · D:\\games\\Zelda.nsp')).not.toBeVisible();
   });
 
   it('groups the DLC and update files and installs the current selection', async () => {

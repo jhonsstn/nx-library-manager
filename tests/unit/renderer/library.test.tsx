@@ -186,12 +186,8 @@ describe('LibraryPage', () => {
 
     expect(getGame).toHaveBeenCalledWith([1]);
     expect(await screen.findByRole('heading', { name: 'Zelda' })).toBeInTheDocument();
-    expect(screen.getByText('NSP | 4.0 GB | D:\\games\\Zelda.nsp')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /Latest Version on File: v65536 \(1\.0\.0\) Latest Version Released: v131072 \(2\.0\.0\) \(2024-05-01\)/,
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Base file · NSP · 4.0 GB · Zelda.nsp')).toBeInTheDocument();
+    expect(screen.getByText('On file: v65536 (1.0.0) · Latest released: v131072 (2.0.0) (2024-05-01)')).toBeInTheDocument();
     expect(screen.getByText('Updates')).toBeInTheDocument();
     expect(screen.getByText('DLC')).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Zelda [UPD][v131072].nsp (v131072) (v2.0)' })).toBeInTheDocument();

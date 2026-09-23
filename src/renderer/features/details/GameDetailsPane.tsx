@@ -4,8 +4,8 @@ import { installSizeText } from '@shared/format/install';
 import {
   detectedVersionSuffix,
   formatInstalledStatus,
-  formatVersionStatusText,
   releasedVersionLabel,
+  versionLabel,
 } from '@shared/format/versions';
 import type { GameDetailsDto, UpdateFileDto, UpdateGroupName } from '@shared/types/domain';
 import { Cover } from '@renderer/components/Cover';
@@ -42,6 +42,13 @@ function groupUpdates(updates: UpdateFileDto[]): Array<{ name: UpdateGroupName; 
   return GROUP_ORDER.map((name) => ({ name, items: updates.filter((update) => update.group === name) })).filter(
     (group) => group.items.length > 0,
   );
+}
+
+function compactFileName(fileName: string): string {
+  return fileName.replace(/\.(nsp|nsz|xci)$/i, '')
+    .replace(/\[v\d+\](?:\s*\([^)]*\))?$/i, '')
+    .replace(/\s*\[[0-9a-f]{16}\]$/i, '')
+    .trim();
 }
 
 /**
@@ -108,9 +115,16 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
   const localVersion = details.versionStatus.localVersion;
   const updateHistory = details.versionStatus.missingUpdate === undefined
     ? details.versionStatus.newer : details.versionStatus.newer.slice(1);
-  const pathText = details.baseFile
-    ? `${details.baseFile.fileType} | ${formatBytes(details.baseFile.fileSize)} | ${details.baseFile.filePath}`
-    : 'No base game file recorded.';
+  const missingUpdate = details.versionStatus.missingUpdate;
+  const statusTone = missingUpdate || details.versionStatus.kind === 'update-available' ? 'warning'
+    : details.versionStatus.kind === 'current' ? 'success' : 'neutral';
+  const statusHeading = missingUpdate ? 'Update file missing'
+    : details.versionStatus.kind === 'update-available' ? 'Newer update available'
+      : details.versionStatus.kind === 'current' ? 'Latest update file present'
+        : details.versionStatus.kind === 'local-newer' ? 'Local file newer than catalog'
+          : 'Update status unknown';
+  const knownDlc = [...(details.knownDlc ?? [])].sort((a, b) => Number(a.filePresent) - Number(b.filePresent));
+  const missingDlcCount = knownDlc.filter((item) => !item.filePresent).length;
 
   const toggleFavorite = () => {
     setFavorite.mutate(
@@ -176,90 +190,80 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
       .join('\n');
 
   return (
-    <article className="stack">
+    <article className="stack game-details">
       <div className="details">
         <Cover src={details.coverDisplayUrl} alt={details.displayTitle} favorite={details.favorite} />
-        <div>
+        <div className="details__overview">
           <h2 className="details__title">{details.displayTitle}</h2>
-          <p className="details__meta">
-            Release: {details.releaseDate || 'Unknown'} | Developer: {details.developer || 'Unknown'} | Publisher:{' '}
-            {details.publisher || 'Unknown'}
+          <p className="details__byline">
+            {details.releaseDate || 'Release date unknown'} · {details.publisher || 'Publisher unknown'}
           </p>
-          <p className="details__meta">Genres: {details.genres.join(', ') || 'Unknown'}</p>
-          <p className="details__meta">Catalog source: {details.metadataProvider?.toUpperCase() ?? 'Local file only'}</p>
-          {details.trailerUrl ? (
-            <Button className="details__trailer" onClick={() => setTrailerOpen(true)}>
-              Trailer
-            </Button>
-          ) : null}
-          <div className="row row--wrap" style={{ marginBottom: 'var(--space-2)' }}>
+          <p className="details__meta">
+            {details.genres.join(' · ') || 'Genre unknown'}
+            {details.developer ? ` · Developed by ${details.developer}` : ''}
+          </p>
+          <div className="details__identity">
+            <span className="badge">{details.metadataProvider?.toUpperCase() ?? 'Local metadata'}</span>
+            <span className="details__title-id">Title ID: {details.titleId ?? 'Unknown (provisional)'}</span>
+          </div>
+          <div className={`details__update-card details__update-card--${statusTone}`} role="status">
+            <strong>{statusHeading}</strong>
+            {missingUpdate ? (
+              <>
+                <span>Missing {releasedVersionLabel(missingUpdate.version, missingUpdate.releaseDate)} · TitleDB</span>
+                <span>Latest on file: {versionLabel(localVersion)}</span>
+              </>
+            ) : details.versionStatus.kind === 'unknown' || details.versionStatus.kind === 'missing-local-version' ? (
+              <span>{details.versionStatus.uncertainty ?? 'Insufficient metadata to compare updates.'}</span>
+            ) : (
+              <span>
+                On file: {versionLabel(localVersion)} · Latest released: {details.versionStatus.latest
+                  ? releasedVersionLabel(details.versionStatus.latest.version, details.versionStatus.latest.releaseDate)
+                  : 'unknown'}
+              </span>
+            )}
+          </div>
+          {details.baseFile ? (
+            <p className="details__file-summary" title={details.baseFile.filePath}>
+              Base file · {details.baseFile.fileType} · {formatBytes(details.baseFile.fileSize)} · {details.baseFile.fileName}
+            </p>
+          ) : <p className="details__file-summary">No base game file recorded.</p>}
+          {details.installed ? <p className="details__installed">{formatInstalledStatus(details.installed)}</p> : null}
+          <div className="row row--wrap details__actions">
             <Button onClick={toggleFavorite}>{details.favorite ? 'Remove favorite' : 'Favorite game'}</Button>
             <Button onClick={toggleNeedsReview}>
               {details.needsReview ? 'Clear needs review' : 'Mark as needs review'}
             </Button>
+            {details.trailerUrl ? <Button onClick={() => setTrailerOpen(true)}>Trailer</Button> : null}
           </div>
-          <p className="details__path">{pathText}</p>
-          <p className="details__meta">Title ID: {details.titleId ?? 'Unknown (provisional)'}</p>
-          <p className="details__status">
-            {details.versionStatus.kind === 'unknown'
-              ? `Update status unknown: ${details.versionStatus.uncertainty ?? 'Insufficient metadata.'}`
-              : formatVersionStatusText({ localVersion, latest: details.versionStatus.latest })}
-          </p>
-          {details.versionStatus.missingUpdate ? (
-            <p className="details__status">Latest known update file missing: {releasedVersionLabel(
-              details.versionStatus.missingUpdate.version,
-              details.versionStatus.missingUpdate.releaseDate,
-            )} (TitleDB)</p>
-          ) : null}
-          {updateHistory.length > 0 ? (
-            <section aria-label={details.versionStatus.missingUpdate === undefined
-              ? 'Newer updates available' : 'Earlier released updates'}>
-              <h3 className="details__section-title">{details.versionStatus.missingUpdate === undefined
-                ? 'Newer Updates Available' : 'Earlier released updates'}</h3>
-              <ul className="list">
-                {updateHistory.map((version) => (
-                  <li key={version.version} className="list__item list__item--static">
-                    {releasedVersionLabel(version.version, version.releaseDate)}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-          <p className="details__status">{formatInstalledStatus(details.installed)}</p>
-          <div
-            className="textarea details__description"
-            role="textbox"
-            aria-readonly="true"
-            aria-label="Description"
-            tabIndex={0}
-          >
-            {details.description || 'No description cached yet.'}
-          </div>
+          <details className="details__disclosure details__about" key={`about-${gameId}`}>
+            <summary>About this game</summary>
+            <p className="details__description">{details.description || 'No description cached yet.'}</p>
+          </details>
         </div>
       </div>
 
       <section aria-label="DLC and updates">
-        <h3 className="details__section-title">DLC/Updates</h3>
-        {details.containedTitles?.length ? <div className="stack">
-          <h4>Detected package contents</h4>
-          <ul className="list">{details.containedTitles.map((item, index) => (
-            <li className="list__item list__item--static" key={`${item.filePath}:${item.titleId ?? index}`}>
-              {item.type.toUpperCase()} · {item.name} · {item.titleId ?? 'Title ID unknown'} ·{' '}
-              {item.rawVersion === null ? 'version unknown' : `v${item.rawVersion}`} ·{' '}
-              {item.provisional ? `provisional filename${item.inspectionError ? ` (${item.inspectionError})` : ''}`
-                : `verified ${item.source}`} · {item.filePath}
+        <h3 className="details__section-title">Updates and DLC</h3>
+        {knownDlc.length ? <div className="details__known-dlc">
+          <div className="details__subheading">
+            <h4>Known DLC</h4>
+            <span>{knownDlc.length} listed{missingDlcCount ? ` · ${missingDlcCount} file${missingDlcCount === 1 ? '' : 's'} missing` : ''}</span>
+          </div>
+          <ul className="details__dlc-list">{knownDlc.map((item) => (
+            <li className="details__dlc-row" key={item.titleId}>
+              <span className="details__dlc-name">{item.name}<small>{item.titleId}</small></span>
+              <span className={`badge ${item.filePresent ? 'badge--ok' : 'badge--update'}`}>
+                {item.filePresent ? 'File present' : 'File missing'}
+              </span>
             </li>
           ))}</ul>
+          <p className="details__source-note">TitleDB · updated {details.knownDlcRefreshedAt?.slice(0, 10) ?? 'unknown date'} · file status refers to this library</p>
         </div> : null}
-        {details.knownDlc?.length ? <div className="stack">
-          <h4>Known DLC (TitleDB)</h4>
-          <p className="dim">Catalog refreshed {details.knownDlcRefreshedAt ?? 'unknown date'}. File presence is based on this library only.</p>
-          <ul className="list">{details.knownDlc.map((item) => (
-            <li className="list__item list__item--static" key={item.titleId}>
-              {item.name} · {item.titleId} · {item.filePresent ? 'file present' : 'file missing'}
-            </li>
-          ))}</ul>
-        </div> : null}
+        <div className="details__subheading details__subheading--local">
+          <h4>Local files</h4>
+          <span>{details.updates.length} update/DLC file{details.updates.length === 1 ? '' : 's'}</span>
+        </div>
         <div className="updates-list" role="listbox" aria-multiselectable="true" aria-label="DLC and updates">
           {groups.length === 0 ? (
             <p className="dim updates-list__empty">No update or DLC files matched to this game yet.</p>
@@ -275,6 +279,8 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
                       type="button"
                       role="option"
                       aria-selected={selected}
+                      aria-label={`${update.fileName}${detectedVersionSuffix(update.detectedVersion)}`}
+                      title={update.fileName}
                       className={`list__item updates-list__item${selected ? ' is-selected' : ''}`}
                       onClick={() =>
                         setSelectedUpdateIds((current) =>
@@ -285,10 +291,10 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
                       }
                       onContextMenu={(event) => openUpdatesMenu(event, update.id)}
                     >
-                      <span className="list__title">
-                        {update.fileName}
-                        {detectedVersionSuffix(update.detectedVersion)}
-                      </span>
+                      <span className="updates-list__name">{compactFileName(update.fileName)}</span>
+                      {update.detectedVersion ? <span className="updates-list__version">
+                        {detectedVersionSuffix(update.detectedVersion).trim()}
+                      </span> : null}
                     </button>
                   );
                 })}
@@ -306,6 +312,27 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
           Install Game + Selected Updates
         </Button>
       </section>
+
+      {updateHistory.length > 0 || details.containedTitles?.length || details.baseFile ? (
+        <details className="details__disclosure details__package-details" key={`packages-${gameId}`}>
+          <summary>Package details <span>{details.containedTitles?.length ?? 0} detected title{details.containedTitles?.length === 1 ? '' : 's'}</span></summary>
+          {details.baseFile ? <p className="details__package-path">Base file: {details.baseFile.filePath}</p> : null}
+          {updateHistory.length > 0 ? <div className="details__package-history">
+            <h4>{missingUpdate === undefined ? 'Newer releases' : 'Earlier releases'}</h4>
+            <ul>{updateHistory.map((version) => (
+              <li key={version.version}>{releasedVersionLabel(version.version, version.releaseDate)}</li>
+            ))}</ul>
+          </div> : null}
+          {details.containedTitles?.length ? <ul className="details__package-list">{details.containedTitles.map((item, index) => (
+            <li key={`${item.filePath}:${item.titleId ?? index}`}>
+              <div><strong>{item.type.toUpperCase()}</strong> · {item.name} · {item.titleId ?? 'Title ID unknown'} ·{' '}
+                {item.rawVersion === null ? 'version unknown' : `v${item.rawVersion}`}</div>
+              <small>{item.provisional ? `Provisional filename${item.inspectionError ? ` · ${item.inspectionError}` : ''}`
+                : `Verified ${item.source}`} · {item.filePath}</small>
+            </li>
+          ))}</ul> : null}
+        </details>
+      ) : null}
 
       {screenshots.length > 0 ? (
         <section aria-label="Screenshots">

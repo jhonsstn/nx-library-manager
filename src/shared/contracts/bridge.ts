@@ -18,6 +18,7 @@ import type {
   ScanProgressDto,
   ScanStatusDto,
   ShutdownStatusDto,
+  UpdateCleanupResultDto,
 } from '../types/domain';
 import type { PublicSettingsDto, SettingsUpdateInput } from '../types/settings';
 import type { DeleteFileResultDto } from './results';
@@ -106,6 +107,7 @@ export function createSwitchCatalogApi(bridge: IpcBridge): SwitchCatalogApi {
     files: {
       chooseDirectory: (input) => call<string | null>(IPC.files.chooseDirectory, [input]),
       deleteFile: (input) => call<DeleteFileResultDto>(IPC.files.deleteFile, [input]),
+      cleanOldUpdates: (gameId, preview) => call<UpdateCleanupResultDto>(IPC.files.cleanOldUpdates, [gameId, preview]),
       moveFile: (input) => call<FileOperationResultDto>(IPC.files.moveFile, [input]),
     },
     install: {

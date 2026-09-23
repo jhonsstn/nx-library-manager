@@ -7,7 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import type { DeleteFileResultDto } from '../../shared/contracts/results';
 import { appError } from '../../shared/errors/app-error';
 import { isShellPath } from '../../shared/format/install';
-import type { FileOperationResultDto } from '../../shared/types/domain';
+import type { FileOperationResultDto, UpdateCleanupPreviewDto, UpdateCleanupResultDto } from '../../shared/types/domain';
 import { withTransaction, type AppDatabase } from '../db/database';
 import type { Logger } from '../lifecycle/logger';
 import {
@@ -18,6 +18,7 @@ import {
 import { deleteGame, getGame } from '../repositories/games.repository';
 import { clearGameIdForUpdates, getUpdate } from '../repositories/updates.repository';
 import { deletePhysicalFileRows, movePhysicalFileRows } from '../repositories/title-catalog.repository';
+import { previewOldUpdates } from '../repositories/update-cleanup.repository';
 
 /** Ports `unique_destination`: `Game.nsp`, `Game (1).nsp`, `Game (2).nsp`, ... */
 export function uniqueDestinationPath(folder: string, fileName: string): string {
@@ -177,6 +178,7 @@ export class FileService {
   private readonly db: AppDatabase;
   private readonly logger: Logger | undefined;
   private readonly trash: ((filePath: string) => Promise<void>) | undefined;
+  private readonly cleaning = new Set<number>();
 
   constructor(options: FileServiceOptions) {
     this.db = options.db;
@@ -188,6 +190,54 @@ export class FileService {
     input: { kind: 'game'; gameId: number } | { kind: 'update'; updateId: number },
   ): Promise<DeleteFileResultDto> {
     return input.kind === 'update' ? this.deleteUpdate(input.updateId) : this.deleteGame(input.gameId);
+  }
+
+  async cleanOldUpdates(gameId: number, expected: UpdateCleanupPreviewDto): Promise<UpdateCleanupResultDto> {
+    if (this.cleaning.has(gameId)) throw appError('JOB_ALREADY_RUNNING', 'Update cleanup is already running.');
+    this.cleaning.add(gameId);
+    try {
+      if (!getGame(this.db, gameId)) throw appError('NOT_FOUND', `No game with id ${gameId}.`);
+      const current = previewOldUpdates(this.db, gameId);
+      if (current.deleteFiles.length === 0 || JSON.stringify(current) !== JSON.stringify(expected)) {
+        throw appError('VALIDATION_ERROR', 'Update files changed. Review the cleanup list again.');
+      }
+      // Check the entire set before deleting the first file. A scan or external
+      // replacement invalidates the preview instead of broadening the cleanup.
+      for (const file of [...current.keepFiles, ...current.deleteFiles]) await this.assertUnchangedUpdate(file);
+      let deletedFiles = 0;
+      let freedBytes = 0;
+      for (const file of current.deleteFiles) {
+        const remaining = previewOldUpdates(this.db, gameId);
+        if (remaining.latestLocalVersion !== current.latestLocalVersion ||
+          !remaining.deleteFiles.some((candidate) => JSON.stringify(candidate) === JSON.stringify(file))) {
+          throw appError('VALIDATION_ERROR', 'Update matches changed during cleanup. Review the remaining files.');
+        }
+        for (const kept of current.keepFiles) await this.assertUnchangedUpdate(kept);
+        await this.assertUnchangedUpdate(file);
+        if (!await this.removeFromDisk(file.filePath)) {
+          throw appError('FILE_MISSING', `Update file is missing: ${file.fileName}`);
+        }
+        withTransaction(this.db, () => deletePhysicalFileRows(this.db, file.filePath));
+        deletedFiles += 1;
+        freedBytes += file.fileSize;
+      }
+      this.logger?.info('files.oldUpdatesCleaned', { gameId, deletedFiles, freedBytes });
+      return { deletedFiles, freedBytes };
+    } finally {
+      this.cleaning.delete(gameId);
+    }
+  }
+
+  private async assertUnchangedUpdate(file: UpdateCleanupPreviewDto['deleteFiles'][number]): Promise<void> {
+    let current;
+    try {
+      current = await stat(file.filePath);
+    } catch {
+      throw appError('FILE_MISSING', `Update file is missing: ${file.fileName}`);
+    }
+    if (!current.isFile() || current.size !== file.fileSize || Math.abs(current.mtimeMs - file.modifiedTime) > 1) {
+      throw appError('VALIDATION_ERROR', `Update file changed: ${file.fileName}. Scan and review again.`);
+    }
   }
 
   async moveTrackedFile(

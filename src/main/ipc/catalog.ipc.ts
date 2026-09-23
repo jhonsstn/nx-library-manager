@@ -9,6 +9,7 @@ import {
   ListGamesInputSchema,
   ListUpdatesInputSchema,
   MoveFileInputSchema,
+  UpdateCleanupPreviewSchema,
   UnmatchUpdatesInputSchema,
 } from '../../shared/schemas/inputs';
 import { appError } from '../../shared/errors/app-error';
@@ -61,6 +62,8 @@ export function registerFilesIpc(deps: IpcDeps): void {
     chooseDirectory(deps, input),
   );
   handle(IPC.files.deleteFile, z.tuple([DeleteFileInputSchema]), (input) => deps.files.deleteTrackedFile(input));
+  handle(IPC.files.cleanOldUpdates, z.tuple([GameIdSchema, UpdateCleanupPreviewSchema]),
+    (gameId, preview) => deps.files.cleanOldUpdates(gameId, preview));
   handle(IPC.files.moveFile, z.tuple([MoveFileInputSchema]), (input) => deps.files.moveTrackedFile(input));
 }
 

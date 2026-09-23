@@ -130,6 +130,29 @@ function renderPane(handlers: Record<string, (args: unknown[]) => unknown>) {
 }
 
 describe('GameDetailsPane', () => {
+  it('reviews older tracked patches before cleaning them', async () => {
+    const user = userEvent.setup();
+    const cleanOldUpdates = vi.fn(() => ({ deletedFiles: 1, freedBytes: 100 }));
+    const preview = {
+      latestLocalVersion: 131072,
+      keepFiles: [{ filePath: 'D:\\updates\\latest.nsp', fileName: 'latest.nsp',
+        fileSize: 200, modifiedTime: 2, rawVersion: 131072 }],
+      deleteFiles: [{ filePath: 'D:\\updates\\old.nsp', fileName: 'old.nsp',
+        fileSize: 100, modifiedTime: 1, rawVersion: 65536 }],
+    };
+    renderPane({
+      [IPC.catalog.getGame]: () => details({ updateCleanup: preview }),
+      [IPC.files.cleanOldUpdates]: cleanOldUpdates,
+    });
+    await user.click(await screen.findByRole('button', { name: 'Clean older updates' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Clean older updates' });
+    expect(confirm).toHaveTextContent('latest.nsp');
+    expect(confirm).toHaveTextContent('old.nsp');
+    expect(cleanOldUpdates).not.toHaveBeenCalled();
+    await user.click(within(confirm).getByRole('button', { name: 'Delete older updates' }));
+    await waitFor(() => expect(cleanOldUpdates).toHaveBeenCalledWith([1, preview]));
+  });
+
   it('shows the game summary while keeping long descriptions and paths collapsed', async () => {
     const user = userEvent.setup();
     renderPane({

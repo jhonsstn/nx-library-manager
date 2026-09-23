@@ -29,6 +29,7 @@ export const IPC = {
   files: {
     chooseDirectory: 'files:chooseDirectory',
     deleteFile: 'files:deleteFile',
+    cleanOldUpdates: 'files:cleanOldUpdates',
     moveFile: 'files:moveFile',
   },
   install: {

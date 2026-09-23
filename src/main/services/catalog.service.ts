@@ -45,6 +45,7 @@ import {
 import { listScreenshots } from '../repositories/screenshots.repository';
 import type { VersionService } from './version.service';
 import { contentsForGame, type ContainedTitle } from '../repositories/title-catalog.repository';
+import { previewOldUpdates } from '../repositories/update-cleanup.repository';
 
 export interface CatalogServiceOptions {
   db: AppDatabase;
@@ -132,6 +133,7 @@ export class CatalogService {
       updates: updates.map((update) => toUpdateDto(update)),
       screenshots,
       versionStatus: this.verifiedVersionStatus(titleId, contents),
+      updateCleanup: previewOldUpdates(this.db, gameId),
       containedTitles: contents,
       knownDlc: titleId ? this.versions.dlcIndex.forBase(titleId).map((entry) => ({
         titleId: entry.titleId, name: entry.name ?? entry.titleId,

@@ -14,6 +14,8 @@ import type {
   ScanProgressDto,
   ScanStatusDto,
   ShutdownStatusDto,
+  UpdateCleanupPreviewDto,
+  UpdateCleanupResultDto,
 } from '../types/domain';
 import type { PublicSettingsDto, SettingsUpdateInput } from '../types/settings';
 import type { DeleteFileResultDto } from './results';
@@ -108,6 +110,7 @@ export interface SwitchCatalogApi {
   files: {
     chooseDirectory(input?: ChooseDirectoryInput): Promise<string | null>;
     deleteFile(input: DeleteFileInput): Promise<DeleteFileResultDto>;
+    cleanOldUpdates(gameId: number, preview: UpdateCleanupPreviewDto): Promise<UpdateCleanupResultDto>;
     moveFile(input: MoveFileInput): Promise<FileOperationResultDto>;
   };
 

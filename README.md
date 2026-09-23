@@ -62,6 +62,6 @@ Basic Authentication over plain HTTP does not encrypt credentials or traffic. Us
 
 ## Packaging and releases
 
-`electron-builder.yml` defines only a Windows x64 portable target. The manual/tag release workflow builds it, generates a SHA-256 checksum, and attaches it to tagged GitHub releases. Pull requests and `main` use a separate Windows workflow for frozen dependency installation, type-checking, tests, and the production build.
+`electron-builder.yml` defines only a Windows x64 portable target. The manual/tag release workflow builds it, generates a SHA-256 checksum, and attaches it to tagged GitHub releases. Pull requests and `main` also build and smoke-test the portable executable after type-checking and tests. Download the `nx-library-manager-windows-portable` artifact from the successful **Electron verification** run to test a PR build on Windows.
 
 See [docs/README.md](docs/README.md) for architecture details and [docs/release-checklist.md](docs/release-checklist.md) for release gates and the Windows manual test matrix.

@@ -104,7 +104,7 @@ export function BulkMetadataDialog({ onClose }: BulkMetadataDialogProps) {
       }
     >
       <p className="panel__hint">
-        Searches IGDB for every unlocked game and fills in cover art, description, release date and trailer. Games
+        Looks up identified games by Title ID in Nlib, then uses IGDB when no usable Nlib record exists. Games
         without a confident match are marked for review so you can rematch them by hand.
       </p>
 

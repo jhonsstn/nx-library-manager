@@ -1,5 +1,5 @@
 import { existsSync, statfsSync, statSync } from 'node:fs';
-import { basename, extname, isAbsolute } from 'node:path';
+import { dirname, isAbsolute } from 'node:path';
 
 import { MTP_TRANSFER_TIMEOUT_SECONDS } from '../../shared/constants';
 import type { CreateInstallInput, InstallDestination } from '../../shared/contracts/api';
@@ -7,7 +7,6 @@ import { SwitchCatalogError, appError, toAppErrorDto } from '../../shared/errors
 import type { AppErrorDto } from '../../shared/errors/codes';
 import { formatBytes } from '../../shared/format/bytes';
 import { isShellPath } from '../../shared/format/install';
-import { rawVersionFromVersionText } from '../../shared/format/versions';
 import { CreateInstallInputSchema } from '../../shared/schemas/inputs';
 import type { GameFileKind, InstallDestinationType, InstallJobDto } from '../../shared/types/domain';
 import type { AppSettings } from '../../shared/types/settings';
@@ -15,7 +14,7 @@ import type { AppDatabase } from '../db/database';
 import { withTransaction } from '../db/database';
 import type { Logger } from '../lifecycle/logger';
 import type { MtpAdapter, MtpStorageDestination, MtpTransferState } from '../mtp/mtp.adapter';
-import { findGameFileByPath, getBaseFile, updateGameFilePath } from '../repositories/game-files.repository';
+import { getBaseFile } from '../repositories/game-files.repository';
 import {
   getInstallJob,
   insertInstallJob,
@@ -25,8 +24,9 @@ import {
   updateInstallJob,
   type InstallJobUpdate,
 } from '../repositories/install-jobs.repository';
-import { getUpdate, listAllUpdates, updateUpdatePath, type UpdateRecord } from '../repositories/updates.repository';
-import { detectVersion, isDlcGroupFilename } from '../scanner/filename-parser';
+import { getUpdate, type UpdateRecord } from '../repositories/updates.repository';
+import { movePhysicalFileRows } from '../repositories/title-catalog.repository';
+import { isDlcGroupFilename } from '../scanner/filename-parser';
 import { moveFileToFolder } from './file.service';
 
 export interface ResolvedInstallDestination {
@@ -319,11 +319,16 @@ export class InstallService {
         fileSize: base.fileSize,
         fileKind: 'base',
         detectedVersion: '',
-        rawVersion: rawVersionFromVersionText(detectVersion(base.fileName)),
+        rawVersion: this.verifiedPatchVersion(base.filePath),
       });
     }
     items.push(...this.updateItems(input.gameId, input.updateIds));
-    return items;
+    const paths = new Set<string>();
+    return items.filter((item) => {
+      if (paths.has(item.sourcePath)) return false;
+      paths.add(item.sourcePath);
+      return true;
+    });
   }
 
   private updateItems(gameId: number | null, updateIds: number[]): QueueItem[] {
@@ -333,7 +338,12 @@ export class InstallService {
       if (seen.has(updateId)) continue;
       seen.add(updateId);
       const update = this.requireUpdate(updateId, gameId);
-      const dlc = isDlcGroupFilename(update.fileName);
+      const knownTypes = this.db.prepare(`SELECT DISTINCT t.type FROM local_files lf
+        JOIN file_titles ft ON ft.local_file_id=lf.id JOIN titles t ON t.id=ft.title_id
+        WHERE lf.file_path=? AND t.provisional=0`).all(update.filePath) as Array<{ type: string }>;
+      const dlc = knownTypes.length
+        ? knownTypes.every((row) => row.type === 'dlc')
+        : isDlcGroupFilename(update.fileName);
       pending.push({
         dlc,
         item: {
@@ -343,7 +353,7 @@ export class InstallService {
           fileSize: update.fileSize,
           fileKind: dlc ? 'dlc' : 'update',
           detectedVersion: update.detectedVersion,
-          rawVersion: rawVersionFromVersionText(detectVersion(update.fileName)),
+          rawVersion: dlc ? 0 : this.verifiedPatchVersion(update.filePath),
         },
       });
     }
@@ -368,6 +378,15 @@ export class InstallService {
       });
     }
     return update;
+  }
+
+  private verifiedPatchVersion(path: string): number {
+    const row = this.db.prepare(`SELECT MAX(ft.raw_version) AS version FROM local_files lf
+      JOIN file_titles ft ON ft.local_file_id=lf.id JOIN titles t ON t.id=ft.title_id
+      WHERE lf.file_path=? AND t.type='update' AND t.provisional=0
+        AND ft.detection_source='cnmt' AND ft.raw_version IS NOT NULL`)
+      .get(path) as { version: number | null };
+    return row.version ?? 0;
   }
 
   private assertSourcesExist(items: QueueItem[]): void {
@@ -507,7 +526,17 @@ export class InstallService {
           this.updateStatus(job.id, { status: 'running', transferredBytes });
         },
       });
-      this.applyFolderDestination(job, destinationPath);
+      try {
+        this.applyFolderDestination(job, destinationPath);
+      } catch (error) {
+        await moveFileToFolder(destinationPath,dirname(job.sourcePath)).catch((restoreError: unknown) => {
+          this.logger?.error('install.catalogMoveRestoreFailed', {
+            installJobId:job.id,
+            reason:restoreError instanceof Error ? restoreError.message : String(restoreError),
+          });
+        });
+        throw error;
+      }
       this.finishJob(job, destinationPath, job.sizeBytes);
     } finally {
       if (this.activeLocalTransfer?.jobId === job.id) this.activeLocalTransfer = null;
@@ -546,30 +575,8 @@ export class InstallService {
    * conflict-free destination actually renamed the file.
    */
   private applyFolderDestination(job: InstallJobDto, destinationPath: string): void {
-    const fileName = basename(destinationPath) || job.displayName;
     const modifiedTime = this.modifiedTimeFor(destinationPath);
-
-    if (job.fileKind === 'base') {
-      const file = findGameFileByPath(this.db, job.sourcePath);
-      if (!file) {
-        this.logger?.warn('install.catalogRowMissing', { installJobId: job.id, sourcePath: job.sourcePath });
-        return;
-      }
-      updateGameFilePath(this.db, file.id, {
-        filePath: destinationPath,
-        fileName,
-        fileExtension: extname(fileName).toLowerCase(),
-        modifiedTime,
-      });
-      return;
-    }
-
-    const update = listAllUpdates(this.db).find((row) => row.filePath === job.sourcePath);
-    if (!update) {
-      this.logger?.warn('install.catalogRowMissing', { installJobId: job.id, sourcePath: job.sourcePath });
-      return;
-    }
-    updateUpdatePath(this.db, update.id, { filePath: destinationPath, fileName, modifiedTime });
+    withTransaction(this.db, () => movePhysicalFileRows(this.db, job.sourcePath, destinationPath, modifiedTime));
   }
 
   private async requireMtpStorage(job: InstallJobDto): Promise<MtpStorageDestination> {

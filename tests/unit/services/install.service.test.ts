@@ -18,6 +18,7 @@ import { getBaseFile, upsertBaseGameFile } from '@main/repositories/game-files.r
 import { upsertGameByCleanedTitle } from '@main/repositories/games.repository';
 import { getInstallJob, insertInstallJob, listJobsByStatus, updateInstallJob } from '@main/repositories/install-jobs.repository';
 import { getUpdate, listAllUpdates, upsertUpdate } from '@main/repositories/updates.repository';
+import { recordInspection } from '@main/repositories/title-catalog.repository';
 import { detectVersion } from '@main/scanner/filename-parser';
 import { InstallService } from '@main/services/install.service';
 import { defaultAppSettings } from '@shared/schemas/settings';
@@ -218,6 +219,14 @@ const MTP_DESTINATION = (storage: 'sd' | 'nand' = 'sd'): { type: 'mtp'; storage:
 describe('install queue ordering', () => {
   it('queues base, then updates oldest-first, then DLC regardless of name', async () => {
     const { gameId, late, early, dlc } = seedLibrary();
+    for (const [item,kind,version,suffix] of [
+      [early,'update',131072,'0800'],[late,'update',262144,'0800'],[dlc,'dlc',65536,'1001'],
+    ] as const) recordInspection(db,{
+      path:item.path,size:kind === 'dlc' ? 4000 : version === 131072 ? 2000 : 3000,
+      mtime:1,parserVersion:1,keysRevision:1,error:null,
+      titles:[{ titleId:`0100AABBCCDD${suffix}`,baseTitleId:'0100AABBCCDD0000',
+        type:kind,rawVersion:version,name:null,publisher:null,source:'cnmt' }],
+    });
     const runningOrder: string[] = [];
     const service = createService({
       onJobChanged: (job) => {
@@ -239,12 +248,34 @@ describe('install queue ordering', () => {
       DLC_NAME,
     ]);
     expect(jobs.map((job) => job.fileKind)).toEqual(['base', 'update', 'update', 'dlc']);
-    expect(jobs.map((job) => job.rawVersion)).toEqual([0, 131072, 262144, 65536]);
+    expect(jobs.map((job) => job.rawVersion)).toEqual([0, 131072, 262144, 0]);
     expect(jobs.every((job) => job.status === 'pending')).toBe(true);
 
     await service.whenIdle();
     expect(runningOrder).toEqual([BASE_NAME, EARLY_UPDATE_NAME, LATE_UPDATE_NAME, DLC_NAME]);
     expect(listJobsByStatus(db, ['completed'])).toHaveLength(4);
+  });
+
+  it('queues a combined base and patch package only once', async () => {
+    const gameId = seedGame('Combined');
+    const base = seedBase(gameId,'Combined.nsp',512);
+    upsertUpdate(db,{ gameId,filePath:base.path,fileName:'Combined.nsp',detectedVersion:'65536',
+      fileSize:512,modifiedTime:1,matchConfidence:1 });
+    const updateId = listAllUpdates(db)[0].id;
+    recordInspection(db,{ path:base.path,size:512,mtime:1,parserVersion:1,keysRevision:1,error:null,
+      titles:[
+        { titleId:'0100AABBCCDD0000',baseTitleId:'0100AABBCCDD0000',type:'base',
+          rawVersion:0,name:'Combined',publisher:null,source:'cnmt' },
+        { titleId:'0100AABBCCDD0800',baseTitleId:'0100AABBCCDD0000',type:'update',
+          rawVersion:65536,name:null,publisher:null,source:'cnmt' },
+      ] });
+    const service = createService();
+    const jobs = await service.create({ gameId,updateIds:[updateId],destination:FOLDER_DESTINATION() });
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].rawVersion).toBe(65536);
+    await service.whenIdle();
+    expect(existsSync(base.path)).toBe(false);
+    expect(getUpdate(db,updateId)?.filePath).toBe(join(installDir,'Combined.nsp'));
   });
 
   it('queues updates only when the base file is excluded', async () => {

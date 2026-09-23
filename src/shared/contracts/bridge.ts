@@ -129,6 +129,8 @@ export function createSwitchCatalogApi(bridge: IpcBridge): SwitchCatalogApi {
     settings: {
       get: () => call<PublicSettingsDto>(IPC.settings.get),
       update: (input: SettingsUpdateInput) => call<PublicSettingsDto>(IPC.settings.update, [input]),
+      importProdKeys: () => call<boolean>(IPC.settings.importProdKeys),
+      removeProdKeys: () => call<void>(IPC.settings.removeProdKeys),
     },
     app: {
       getVersion: () => call<string>(IPC.app.getVersion),

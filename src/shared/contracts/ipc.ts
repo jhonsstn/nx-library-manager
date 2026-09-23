@@ -49,6 +49,8 @@ export const IPC = {
   settings: {
     get: 'settings:get',
     update: 'settings:update',
+    importProdKeys: 'settings:importProdKeys',
+    removeProdKeys: 'settings:removeProdKeys',
   },
   app: {
     getVersion: 'app:getVersion',

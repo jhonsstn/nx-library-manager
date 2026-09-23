@@ -198,7 +198,7 @@ export function latestCompletedInstall(db: AppDatabase, gameId: number): Install
   const row = db
     .prepare(
       `SELECT ${JOB_COLUMNS} FROM install_jobs
-       WHERE game_id = ? AND status = 'completed'
+       WHERE game_id = ? AND status = 'completed' AND file_kind != 'dlc'
        ORDER BY raw_version DESC, completed_at DESC LIMIT 1`,
     )
     .get(gameId) as InstallJobRow | undefined;

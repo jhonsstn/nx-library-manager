@@ -2,6 +2,7 @@ import type { AppDatabase } from '../db/database';
 import type { Logger } from '../lifecycle/logger';
 import type { AppPaths } from '../platform/paths';
 import type { SettingsStore } from '../settings/settings.store';
+import type { ProdKeysStore } from '../settings/prod-keys';
 import type { CatalogService } from '../services/catalog.service';
 import type { ScannerService } from '../services/scanner.service';
 import type { MetadataService } from '../services/metadata.service';
@@ -17,6 +18,7 @@ export interface IpcDeps {
   db: AppDatabase;
   logger: Logger;
   settings: SettingsStore;
+  prodKeys: ProdKeysStore;
   catalog: CatalogService;
   scanner: ScannerService;
   metadata: MetadataService;

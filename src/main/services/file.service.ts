@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream, existsSync } from 'node:fs';
 import { mkdir, rename, rm, stat, unlink } from 'node:fs/promises';
-import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { DeleteFileResultDto } from '../../shared/contracts/results';
@@ -14,10 +14,10 @@ import {
   deleteGameFilesForGame,
   getBaseFile,
   listGameFiles,
-  updateGameFilePath,
 } from '../repositories/game-files.repository';
 import { deleteGame, getGame } from '../repositories/games.repository';
-import { clearGameIdForUpdates, deleteUpdate, getUpdate, updateUpdatePath } from '../repositories/updates.repository';
+import { clearGameIdForUpdates, getUpdate } from '../repositories/updates.repository';
+import { deletePhysicalFileRows, movePhysicalFileRows } from '../repositories/title-catalog.repository';
 
 /** Ports `unique_destination`: `Game.nsp`, `Game (1).nsp`, `Game (2).nsp`, ... */
 export function uniqueDestinationPath(folder: string, fileName: string): string {
@@ -202,8 +202,6 @@ export class FileService {
         id: input.updateId,
         sourcePath: update.filePath,
         destinationFolder: input.destinationFolder,
-        persist: (filePath, fileName, modifiedTime) =>
-          updateUpdatePath(this.db, update.id, { filePath, fileName, modifiedTime }),
       });
     }
 
@@ -215,13 +213,6 @@ export class FileService {
       id: input.gameId,
       sourcePath: baseFile.filePath,
       destinationFolder: input.destinationFolder,
-      persist: (filePath, fileName, modifiedTime) =>
-        updateGameFilePath(this.db, baseFile.id, {
-          filePath,
-          fileName,
-          fileExtension: extname(fileName).toLowerCase(),
-          modifiedTime,
-        }),
     });
   }
 
@@ -230,7 +221,7 @@ export class FileService {
     if (!update) throw appError('NOT_FOUND', `No update or DLC file with id ${updateId}.`);
     const deletedFromDisk = await this.removeFromDisk(update.filePath);
     withTransaction(this.db, () => {
-      deleteUpdate(this.db, updateId);
+      deletePhysicalFileRows(this.db, update.filePath);
     });
     this.logger?.info('files.deleted', { updateId, kind: 'update', deletedFromDisk });
     return { id: updateId, kind: 'update', deletedFromDisk, cascaded: false };
@@ -241,11 +232,15 @@ export class FileService {
     if (!game) throw appError('NOT_FOUND', `No game with id ${gameId}.`);
     let deletedFromDisk = false;
     // Only base game files are removed; update/DLC files remain independent.
+    const paths = new Set<string>();
     for (const file of listGameFiles(this.db, gameId)) {
       if (!file.isBaseGame) continue;
+      if (paths.has(file.filePath)) continue;
+      paths.add(file.filePath);
       if (await this.removeFromDisk(file.filePath)) deletedFromDisk = true;
     }
     withTransaction(this.db, () => {
+      for (const path of paths) deletePhysicalFileRows(this.db, path);
       // Update and DLC rows stay in the catalog but lose their association;
       // `game_files` and `screenshots` rows cascade with the game row.
       clearGameIdForUpdates(this.db, gameId);
@@ -260,7 +255,6 @@ export class FileService {
     id: number;
     sourcePath: string;
     destinationFolder: string;
-    persist: (filePath: string, fileName: string, modifiedTime: number) => void;
   }): Promise<FileOperationResultDto> {
     const folder = await prepareDestinationFolder(input.destinationFolder);
     const sourcePath = input.sourcePath;
@@ -268,7 +262,7 @@ export class FileService {
     const modifiedTime = (await stat(destinationPath)).mtimeMs;
     try {
       withTransaction(this.db, () => {
-        input.persist(destinationPath, basename(destinationPath), modifiedTime);
+        movePhysicalFileRows(this.db, sourcePath, destinationPath, modifiedTime);
       });
     } catch (error) {
       await this.compensateMove(destinationPath, sourcePath);

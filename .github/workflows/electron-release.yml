@@ -43,6 +43,12 @@ jobs:
       - name: Package Windows installer and portable build
         run: pnpm exec electron-builder --win --x64 --publish never
 
+      - name: Smoke test packaged app
+        shell: pwsh
+        run: |
+          & 'release/win-unpacked/Switch Game Catalog.exe' --smoke-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Generate checksums
         shell: pwsh
         run: |

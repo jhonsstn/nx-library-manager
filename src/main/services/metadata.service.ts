@@ -8,7 +8,6 @@ import { appError } from '../../shared/errors/app-error';
 import {
   applyMetadataResult,
   getGame,
-  listGamesForBulkRefresh,
   listGamesNeedingMetadata,
   setCoverImagePath,
   setNeedsReview,
@@ -20,6 +19,7 @@ import {
 } from '../repositories/screenshots.repository';
 import type { ImageCache } from '../metadata/image-cache';
 import { IgdbClient } from '../metadata/igdb.client';
+import { NlibClient } from '../metadata/nlib.client';
 
 /** Bulk refresh concurrency and progress cadence (spec 07: rate limits). */
 const BULK_CONCURRENCY = 3;
@@ -67,6 +67,7 @@ export class MetadataService {
   private readonly fetchImpl: typeof fetch | undefined;
   private client: IgdbClient | null = null;
   private clientKey = '';
+  private readonly nlib: NlibClient;
 
   constructor(options: MetadataServiceOptions) {
     this.db = options.db;
@@ -75,6 +76,7 @@ export class MetadataService {
     this.imageCache = options.imageCache;
     this.logger = options.logger;
     this.fetchImpl = options.fetchImpl;
+    this.nlib = new NlibClient(options.db, options.fetchImpl);
   }
 
   /** Both IGDB credentials stored; searching without them would just 401. */
@@ -105,6 +107,15 @@ export class MetadataService {
       lock: options.lock ?? false,
       needsReview: options.needsReview ?? false,
     });
+    this.db.prepare(`UPDATE titles SET
+      display_name = CASE WHEN ? OR name_source NOT IN ('nacp','manual') THEN ? ELSE display_name END,
+      name_source = CASE WHEN ? THEN 'manual' WHEN name_source IN ('nacp','manual') THEN name_source ELSE ? END,
+      metadata_provider = ?, description=?,release_date=?,developer=?,publisher=?,genres=?,icon_url=?
+      WHERE game_id=? AND type='base'`).run(
+        options.lock ? 1 : 0, candidate.title, options.lock ? 1 : 0,
+        candidate.provider, candidate.provider, candidate.description,candidate.releaseDate,
+        candidate.developer,candidate.publisher,JSON.stringify(candidate.genres),candidate.coverImageUrl,gameId,
+      );
     replaceScreenshots(this.db, gameId, candidate.screenshots);
 
     if (candidate.coverImageUrl) {
@@ -127,6 +138,19 @@ export class MetadataService {
     if (!game) throw appError('NOT_FOUND', `No game with id ${gameId}.`);
     if (game.metadataLocked) return false;
 
+    const title = this.db.prepare("SELECT title_id FROM titles WHERE game_id = ? AND type = 'base' AND provisional = 0 LIMIT 1")
+      .get(gameId) as { title_id: string } | undefined;
+    const exact = title ? await this.nlib.lookup(title.title_id) : null;
+    if (exact) {
+      await this.applyCandidate(gameId, exact, { lock: false, needsReview: false });
+      this.db.prepare(`UPDATE titles SET nsu_id = ?, banner_url = ?, metadata_provider = 'nlib',
+        description = ?, publisher = ?, developer = ?, release_date = ?, genres = ?, icon_url = ?
+        WHERE game_id = ? AND type = 'base'`).run(
+        exact.nsuId, exact.bannerUrl, exact.description, exact.publisher, exact.developer,
+        exact.releaseDate, JSON.stringify(exact.genres), exact.coverImageUrl, gameId,
+      );
+      return true;
+    }
     const candidates = await this.searchCandidates(gameId);
     if (candidates.length === 0) {
       setNeedsReview(this.db, gameId, true);
@@ -150,7 +174,7 @@ export class MetadataService {
     const force = options.force ?? false;
     const games = force
       ? listGamesNeedingMetadata(this.db, { force: true, limit: options.limit })
-      : listGamesForBulkRefresh(this.db, 'igdb', options.limit);
+      : this.identifiedGamesNeedingMetadata(options.limit);
 
     const jobId = randomUUID();
     let processed = 0;
@@ -230,6 +254,15 @@ export class MetadataService {
       });
       return null;
     }
+  }
+
+  private identifiedGamesNeedingMetadata(limit?: number): Array<{ id: number; displayTitle: string; cleanedTitle: string }> {
+    const rows = this.db.prepare(`SELECT DISTINCT g.id, g.display_title, g.cleaned_title FROM games g
+      JOIN titles t ON t.game_id=g.id AND t.type='base' AND t.provisional=0 AND t.title_id IS NOT NULL
+      WHERE g.metadata_locked=0 AND (g.metadata_provider IS NULL OR g.metadata_provider!='nlib' OR g.needs_review=1)
+      ORDER BY g.display_title COLLATE NOCASE ${limit ? `LIMIT ${Math.trunc(limit)}` : ''}`)
+      .all() as Array<{ id: number; display_title: string; cleaned_title: string }>;
+    return rows.map((row) => ({ id:row.id, displayTitle:row.display_title, cleanedTitle:row.cleaned_title }));
   }
 
   /** One client per credential set, so the OAuth token is fetched once. */

@@ -7,6 +7,7 @@ import { isPathInsideFolder } from '../../shared/format/install';
 import { latestCompletedInstall } from '../repositories/install-jobs.repository';
 import { loadVersionRecords, readCachedVersionRecords } from '../versions/version-cache';
 import { versionStatusInput, type VersionRecords } from '../versions/version-records';
+import { DlcIndexCache } from '../versions/dlc-index';
 
 export interface VersionServiceOptions {
   db: AppDatabase;
@@ -38,6 +39,7 @@ export class VersionService {
   private readonly now: () => number;
   private records: VersionRecords = {};
   private loaded = false;
+  readonly dlcIndex: DlcIndexCache;
 
   constructor(options: VersionServiceOptions) {
     this.db = options.db;
@@ -45,6 +47,8 @@ export class VersionService {
     this.logger = options.logger;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.now = options.now ?? Date.now;
+    this.dlcIndex = new DlcIndexCache(options.paths.versionsCacheDir);
+    this.dlcIndex.loadCached();
   }
 
   /** Loads from cache, refreshing once the 24h staleness window has passed. */
@@ -54,6 +58,7 @@ export class VersionService {
       fetchImpl: this.fetchImpl,
       now: this.now(),
       refresh: options.refresh ?? false,
+      knownPatchIds: this.dlcIndex.patchIds,
     });
     this.records = result.versions;
     this.loaded = true;
@@ -70,7 +75,7 @@ export class VersionService {
     this.records = readCachedVersionRecords({
       versionsJsonFile: this.paths.versionsJsonFile,
       versionsTxtFile: this.paths.versionsTxtFile,
-    });
+    }, this.dlcIndex.patchIds);
     this.loaded = true;
     return this.records;
   }

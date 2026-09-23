@@ -17,7 +17,8 @@ export interface AppSettings {
   autoCheckUpdatesOnStartup: boolean;
   cacheImages: boolean;
 
-  metadataProvider: 'igdb';
+  /** Legacy `igdb` settings are normalized to `nlib` on load. */
+  metadataProvider: 'nlib' | 'igdb';
   igdbClientId: string;
   igdbClientSecret?: string;
 
@@ -37,6 +38,7 @@ export interface AppSettings {
 export type PublicSettingsDto = Omit<AppSettings, 'igdbClientSecret' | 'httpServerPassword'> & {
   igdbClientSecretConfigured: boolean;
   httpServerPasswordConfigured: boolean;
+  prodKeysConfigured?: boolean;
 };
 
 /**

@@ -53,7 +53,9 @@ function planFiles(
   updateIds: number[],
 ): PlannedFile[] {
   const plan: PlannedFile[] = [];
+  const seenPaths = new Set<string>();
   if (baseFile) {
+    seenPaths.add(baseFile.filePath);
     plan.push({
       key: `base-${baseFile.id}`,
       name: baseFile.fileName,
@@ -76,6 +78,8 @@ function planFiles(
     .filter((row) => row.group === 'DLC')
     .sort((left, right) => left.fileName.localeCompare(right.fileName));
   for (const row of [...updateFiles, ...dlcFiles]) {
+    if (seenPaths.has(row.filePath)) continue;
+    seenPaths.add(row.filePath);
     plan.push({
       key: `update-${row.id}`,
       name: row.fileName,

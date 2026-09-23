@@ -91,15 +91,23 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
   const details: GameDetailsDto = query.data;
 
   const selectedUpdates = details.updates.filter((update) => selectedUpdateIds.includes(update.id));
-  const selectedUpdateSize = selectedUpdates.reduce((total, update) => total + (update.fileSize || 0), 0);
+  const extraPaths = new Set<string>();
+  const uniqueUpdates = selectedUpdates.filter((update) => {
+    if (update.filePath === details.baseFile?.filePath || extraPaths.has(update.filePath)) return false;
+    extraPaths.add(update.filePath);
+    return true;
+  });
+  const selectedUpdateSize = uniqueUpdates.reduce((total, update) => total + (update.fileSize || 0), 0);
   const installSummary = installSizeText({
     baseSize: details.baseFile?.fileSize ?? 0,
-    selectedUpdateCount: selectedUpdates.length,
+    selectedUpdateCount: uniqueUpdates.length,
     selectedUpdateSize,
   });
   const groups = groupUpdates(details.updates);
   const screenshots = details.screenshots.slice(0, MAX_SCREENSHOTS);
   const localVersion = details.versionStatus.localVersion;
+  const updateHistory = details.versionStatus.missingUpdate === undefined
+    ? details.versionStatus.newer : details.versionStatus.newer.slice(1);
   const pathText = details.baseFile
     ? `${details.baseFile.fileType} | ${formatBytes(details.baseFile.fileSize)} | ${details.baseFile.filePath}`
     : 'No base game file recorded.';
@@ -147,16 +155,24 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
   const deleteSelectedUpdates = async (ids: number[]) => {
     setDeleteIds(null);
     try {
-      for (const updateId of ids) await deleteFile.mutateAsync({ kind: 'update', updateId });
-      toast.success('Update files deleted', `${ids.length} file(s) removed from disk`);
+      const paths = new Set<string>();
+      let deleted = 0;
+      for (const updateId of ids) {
+        const update = details.updates.find((item) => item.id === updateId);
+        if (!update || paths.has(update.filePath)) continue;
+        paths.add(update.filePath);
+        await deleteFile.mutateAsync({ kind: 'update', updateId });
+        deleted += 1;
+      }
+      toast.success('Update files deleted', `${deleted} physical file(s) removed from disk`);
     } catch (error) {
       toast.error('Could not delete every update file', errorMessage(error));
     }
   };
 
   const deleteFileNames = (ids: number[]) =>
-    ids
-      .map((id) => details.updates.find((update) => update.id === id)?.fileName ?? `#${id}`)
+    [...new Set(ids.map((id) => details.updates.find((update) => update.id === id)?.filePath ?? `#${id}`))]
+      .map((path) => `${path}${path === details.baseFile?.filePath ? ' (also contains the base game)' : ''}`)
       .join('\n');
 
   return (
@@ -170,6 +186,7 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
             {details.publisher || 'Unknown'}
           </p>
           <p className="details__meta">Genres: {details.genres.join(', ') || 'Unknown'}</p>
+          <p className="details__meta">Catalog source: {details.metadataProvider?.toUpperCase() ?? 'Local file only'}</p>
           {details.trailerUrl ? (
             <Button className="details__trailer" onClick={() => setTrailerOpen(true)}>
               Trailer
@@ -182,14 +199,25 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
             </Button>
           </div>
           <p className="details__path">{pathText}</p>
+          <p className="details__meta">Title ID: {details.titleId ?? 'Unknown (provisional)'}</p>
           <p className="details__status">
-            {formatVersionStatusText({ localVersion, latest: details.versionStatus.latest })}
+            {details.versionStatus.kind === 'unknown'
+              ? `Update status unknown: ${details.versionStatus.uncertainty ?? 'Insufficient metadata.'}`
+              : formatVersionStatusText({ localVersion, latest: details.versionStatus.latest })}
           </p>
-          {details.versionStatus.newer.length > 0 ? (
-            <section aria-label="Newer updates available">
-              <h3 className="details__section-title">Newer Updates Available</h3>
+          {details.versionStatus.missingUpdate ? (
+            <p className="details__status">Latest known update file missing: {releasedVersionLabel(
+              details.versionStatus.missingUpdate.version,
+              details.versionStatus.missingUpdate.releaseDate,
+            )} (TitleDB)</p>
+          ) : null}
+          {updateHistory.length > 0 ? (
+            <section aria-label={details.versionStatus.missingUpdate === undefined
+              ? 'Newer updates available' : 'Earlier released updates'}>
+              <h3 className="details__section-title">{details.versionStatus.missingUpdate === undefined
+                ? 'Newer Updates Available' : 'Earlier released updates'}</h3>
               <ul className="list">
-                {details.versionStatus.newer.map((version) => (
+                {updateHistory.map((version) => (
                   <li key={version.version} className="list__item list__item--static">
                     {releasedVersionLabel(version.version, version.releaseDate)}
                   </li>
@@ -212,6 +240,26 @@ export function GameDetailsPane({ gameId }: GameDetailsPaneProps) {
 
       <section aria-label="DLC and updates">
         <h3 className="details__section-title">DLC/Updates</h3>
+        {details.containedTitles?.length ? <div className="stack">
+          <h4>Detected package contents</h4>
+          <ul className="list">{details.containedTitles.map((item, index) => (
+            <li className="list__item list__item--static" key={`${item.filePath}:${item.titleId ?? index}`}>
+              {item.type.toUpperCase()} · {item.name} · {item.titleId ?? 'Title ID unknown'} ·{' '}
+              {item.rawVersion === null ? 'version unknown' : `v${item.rawVersion}`} ·{' '}
+              {item.provisional ? `provisional filename${item.inspectionError ? ` (${item.inspectionError})` : ''}`
+                : `verified ${item.source}`} · {item.filePath}
+            </li>
+          ))}</ul>
+        </div> : null}
+        {details.knownDlc?.length ? <div className="stack">
+          <h4>Known DLC (TitleDB)</h4>
+          <p className="dim">Catalog refreshed {details.knownDlcRefreshedAt ?? 'unknown date'}. File presence is based on this library only.</p>
+          <ul className="list">{details.knownDlc.map((item) => (
+            <li className="list__item list__item--static" key={item.titleId}>
+              {item.name} · {item.titleId} · {item.filePresent ? 'file present' : 'file missing'}
+            </li>
+          ))}</ul>
+        </div> : null}
         <div className="updates-list" role="listbox" aria-multiselectable="true" aria-label="DLC and updates">
           {groups.length === 0 ? (
             <p className="dim updates-list__empty">No update or DLC files matched to this game yet.</p>

@@ -11,6 +11,7 @@ import { getGame, upsertGameByCleanedTitle } from '@main/repositories/games.repo
 import { listScreenshots, replaceScreenshots } from '@main/repositories/screenshots.repository';
 import { getUpdate, listAllUpdates, upsertUpdate } from '@main/repositories/updates.repository';
 import { FileService, deleteFileIfPresent, moveFileToFolder, uniqueDestinationPath } from '@main/services/file.service';
+import { recordInspection } from '@main/repositories/title-catalog.repository';
 import { SwitchCatalogError } from '@shared/errors/app-error';
 import type { AppErrorCode } from '@shared/errors/codes';
 
@@ -118,6 +119,33 @@ describe('uniqueDestinationPath', () => {
     writeFile(join(dir, 'Game (2).nsp'));
     expect(uniqueDestinationPath(dir, 'Game.nsp')).toBe(join(dir, 'Game (3).nsp'));
     expect(uniqueDestinationPath(dir, 'README')).toBe(join(dir, 'README'));
+  });
+});
+
+describe('combined physical files', () => {
+  it('moves and deletes one package while updating every linked row', async () => {
+    const { db, service, libraryDir, destinationDir } = createHarness();
+    const { gameId, filePath } = seedGame(db,libraryDir);
+    upsertUpdate(db,{ gameId,filePath,fileName:'Game.nsp',detectedVersion:'65536',
+      fileSize:10,modifiedTime:1,matchConfidence:1 });
+    recordInspection(db,{ path:filePath,size:10,mtime:1,parserVersion:1,keysRevision:1,error:null,
+      titles:[
+        { titleId:'0100AABBCCDD0000',baseTitleId:'0100AABBCCDD0000',type:'base',
+          rawVersion:0,name:'Game',publisher:null,source:'cnmt' },
+        { titleId:'0100AABBCCDD0800',baseTitleId:'0100AABBCCDD0000',type:'update',
+          rawVersion:65536,name:null,publisher:null,source:'cnmt' },
+      ] });
+    const update = listAllUpdates(db)[0];
+    const moved = await service.moveTrackedFile({ kind:'game',gameId,destinationFolder:destinationDir });
+    expect(existsSync(filePath)).toBe(false);
+    expect(existsSync(moved.destinationPath)).toBe(true);
+    expect(db.prepare('SELECT file_path FROM local_files').get()).toMatchObject({ file_path:moved.destinationPath });
+    expect(getUpdate(db,update.id)?.filePath).toBe(moved.destinationPath);
+    await service.deleteTrackedFile({ kind:'update',updateId:update.id });
+    expect(existsSync(moved.destinationPath)).toBe(false);
+    expect(db.prepare('SELECT count(*) AS n FROM local_files').get()).toMatchObject({ n:0 });
+    expect(db.prepare('SELECT count(*) AS n FROM file_titles').get()).toMatchObject({ n:0 });
+    expect(listGameFiles(db,gameId)).toHaveLength(0);
   });
 });
 

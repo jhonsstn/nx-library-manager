@@ -14,6 +14,11 @@ import { isUpdateOrDlcFilename } from '../scanner/filename-parser';
 import { reconcileLibrary } from '../scanner/reconcile';
 import { ProgressFlusher, ScanJob } from '../scanner/scan-job';
 import { walkLibrary, type LibraryFileEntry } from '../scanner/walk-library';
+import { INSPECTOR_VERSION, type InspectedTitle } from '../scanner/package-inspector';
+import { inspectInWorker } from '../scanner/inspect-worker';
+import { cachedInspection, cachedHasBaseTitle, recordInspection, pruneMissingLocalFiles, resolveTitleParents } from '../repositories/title-catalog.repository';
+import type { ProdKeysStore } from '../settings/prod-keys';
+import { existsSync } from 'node:fs';
 
 /**
  * Scan orchestration (spec 05): discovery, classification, matching and
@@ -23,6 +28,7 @@ import { walkLibrary, type LibraryFileEntry } from '../scanner/walk-library';
 
 export interface ScannerServiceOptions {
   db: AppDatabase;
+  prodKeys?: ProdKeysStore;
   logger?: Logger;
   /** Clock seam; defaults to `Date.now`. */
   now?: () => number;
@@ -58,6 +64,7 @@ const CLASSIFY_BATCH_SIZE = 256;
 
 export class ScannerService {
   private readonly db: AppDatabase;
+  private readonly prodKeys: ProdKeysStore | undefined;
   private readonly logger: Logger | undefined;
   private readonly now: () => number;
   private readonly onProgress: ((event: ScanProgressDto) => void) | undefined;
@@ -69,6 +76,7 @@ export class ScannerService {
 
   constructor(options: ScannerServiceOptions) {
     this.db = options.db;
+    this.prodKeys = options.prodKeys;
     this.logger = options.logger;
     this.now = options.now ?? Date.now;
     this.onProgress = options.onProgress;
@@ -205,6 +213,37 @@ export class ScannerService {
       const classified = classifyEntries(baseEntries, updateEntries, scope.mode, job);
       if (job.isCancelled) return this.complete(entry, flusher, unmatchedUpdates, null);
 
+      // The container inspection runs off the renderer/main event loop. Cache
+      // keys include the parser and encrypted-key revision so replacing keys
+      // reevaluates every package without rewriting unchanged records.
+      const keys = this.prodKeys?.read() ?? null;
+      const keysRevision = this.prodKeys?.revision ?? 0;
+      const inspections = new Map<string, { entry: LibraryFileEntry; titles: InspectedTitle[]; error: string | null }>();
+      for (const item of [...baseEntries, ...updateEntries]) {
+        if (job.isCancelled) break;
+        job.record({ currentPath: item.path });
+        tick();
+        if (cachedInspection(this.db, item.path, item.sizeBytes, item.modifiedTime,
+          INSPECTOR_VERSION, keysRevision)) {
+          const hasBase = cachedHasBaseTitle(this.db, item.path);
+          if (hasBase !== null) reclassify(classified,item,hasBase);
+          continue;
+        }
+        try {
+          const titles = await inspectInWorker(item.path, keys, signal);
+          inspections.set(item.path, { entry: item, titles,
+            error: titles.length ? null : keys ? 'No readable CNMT metadata' : 'Import prod.keys to inspect encrypted package metadata' });
+          if (titles.length) {
+            reclassify(classified,item,titles.some((title) => title.type === 'base'));
+          }
+        } catch (error) {
+          if (job.isCancelled) break;
+          inspections.set(item.path, { entry: item, titles: [],
+            error: error instanceof Error ? error.message : String(error) });
+        }
+      }
+      if (job.isCancelled) return this.complete(entry, flusher, unmatchedUpdates, null);
+
       job.setPhase('matching');
       tick();
       if (job.isCancelled) return this.complete(entry, flusher, unmatchedUpdates, null);
@@ -231,9 +270,18 @@ export class ScannerService {
           tick();
         },
       });
+      if (!job.isCancelled) withTransaction(this.db, () => {
+        for (const { entry: item, titles, error } of inspections.values()) recordInspection(this.db, {
+          path: item.path, size: item.sizeBytes, mtime: item.modifiedTime,
+          parserVersion: INSPECTOR_VERSION, keysRevision, titles, error,
+        });
+        resolveTitleParents(this.db);
+        pruneMissingLocalFiles(this.db, existsSync);
+      });
       job.record({
         gamesFound: summary.gamesFound - reportedGames,
         updatesFound: summary.updatesFound - reportedUpdates,
+        currentPath: scope.updatesFolder ?? scope.baseFolder,
       });
       unmatchedUpdates = summary.unmatchedUpdates;
       return this.complete(entry, flusher, unmatchedUpdates, null);
@@ -289,6 +337,19 @@ export class ScannerService {
       if (this.jobs.size <= JOB_HISTORY_LIMIT) break;
       if (entry.finished && entry !== this.active) this.jobs.delete(id);
     }
+  }
+}
+
+function reclassify(classified: { base: LibraryFileEntry[]; updates: LibraryFileEntry[] },
+  item: LibraryFileEntry, hasBase: boolean): void {
+  const inBase = classified.base.findIndex((entry) => entry.path === item.path);
+  const inUpdates = classified.updates.findIndex((entry) => entry.path === item.path);
+  if (hasBase && inUpdates >= 0) {
+    classified.updates.splice(inUpdates,1);
+    classified.base.push(item);
+  } else if (!hasBase && inBase >= 0) {
+    classified.base.splice(inBase,1);
+    classified.updates.push(item);
   }
 }
 

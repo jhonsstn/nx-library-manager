@@ -28,6 +28,7 @@ export interface VersionCacheOptions {
   fetchImpl?: typeof fetch;
   now?: number;
   refresh?: boolean;
+  knownPatchIds?: ReadonlySet<string> | null;
 }
 
 export interface VersionCacheResult {
@@ -165,10 +166,10 @@ async function loadSource(options: {
 }
 
 /** Reads existing cache synchronously so startup can render immediately. */
-export function readCachedVersionRecords(paths: VersionCachePaths): VersionRecords {
+export function readCachedVersionRecords(paths: VersionCachePaths, knownPatchIds?: ReadonlySet<string> | null): VersionRecords {
   return mergeVersionRecords(
     readCacheFile(paths.versionsJsonFile, parseJsonVersions),
-    readCacheFile(paths.versionsTxtFile, parseVersionsTxt),
+    readCacheFile(paths.versionsTxtFile, (text) => parseVersionsTxt(text, knownPatchIds ?? undefined)),
   );
 }
 
@@ -192,7 +193,7 @@ export async function loadVersionRecords(options: VersionCacheOptions): Promise<
     url: VERSIONS_TXT_URL,
     mustRefresh: refresh || isCacheStale(mtimeOrNull(paths.versionsTxtFile), now),
     fetchImpl,
-    parse: parseVersionsTxt,
+    parse: (text) => parseVersionsTxt(text, options.knownPatchIds ?? undefined),
   });
 
   return {

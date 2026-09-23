@@ -224,7 +224,9 @@ export function applyMetadataResult(
   db.prepare(
     `
     UPDATE games SET
-        display_title = ?,
+        display_title = CASE WHEN ? THEN ? WHEN EXISTS (
+          SELECT 1 FROM titles WHERE game_id = ? AND type = 'base' AND name_source = 'nacp'
+        ) THEN display_title ELSE ? END,
         metadata_provider = ?,
         metadata_provider_id = ?,
         description = ?,
@@ -239,6 +241,9 @@ export function applyMetadataResult(
     WHERE id = ?
     `,
   ).run(
+    options.lock ? 1 : 0,
+    result.title,
+    gameId,
     result.title,
     result.provider,
     result.providerId,
@@ -323,13 +328,17 @@ export function allGameTitles(db: AppDatabase): Map<number, string> {
 /** Removes every catalog row, mirroring `db.reset_library_cache`. */
 export function resetLibrary(db: AppDatabase): void {
   db.exec(`
+    DELETE FROM file_titles;
+    DELETE FROM local_files;
+    DELETE FROM titles;
     DELETE FROM install_jobs;
     DELETE FROM updates;
     DELETE FROM screenshots;
     DELETE FROM game_files;
     DELETE FROM games;
     DELETE FROM sqlite_sequence
-      WHERE name IN ('install_jobs', 'updates', 'screenshots', 'game_files', 'games');
+      WHERE name IN ('install_jobs', 'updates', 'screenshots', 'game_files', 'games',
+        'file_titles', 'local_files', 'titles');
   `);
 }
 

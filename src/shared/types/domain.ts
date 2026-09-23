@@ -73,6 +73,27 @@ export interface VersionStatusDto {
   localVersion: number;
   latest: VersionInfoDto | null;
   newer: VersionInfoDto[];
+  /** Only populated when a verified patch version can be compared with TitleDB. */
+  missingUpdate?: VersionInfoDto | null;
+  uncertainty?: string | null;
+}
+
+export interface ContainedTitleDto {
+  titleId: string | null;
+  baseTitleId: string | null;
+  type: GameFileKind;
+  name: string;
+  rawVersion: number | null;
+  source: string;
+  filePath: string;
+  provisional: boolean;
+  inspectionError: string | null;
+}
+
+export interface KnownDlcDto {
+  titleId: string;
+  name: string;
+  filePresent: boolean;
 }
 
 export interface InstalledStatusDto {
@@ -99,6 +120,7 @@ export interface GameSummaryDto {
   baseFile: GameFileDto | null;
   updateCount: number;
   hasNewerUpdate: boolean;
+  titleId?: string | null;
 }
 
 export interface GameDetailsDto extends GameSummaryDto {
@@ -113,6 +135,9 @@ export interface GameDetailsDto extends GameSummaryDto {
   screenshots: ScreenshotDto[];
   versionStatus: VersionStatusDto;
   installed: InstalledStatusDto | null;
+  containedTitles?: ContainedTitleDto[];
+  knownDlc?: KnownDlcDto[];
+  knownDlcRefreshedAt?: string | null;
 }
 
 export interface ScanProgressDto {

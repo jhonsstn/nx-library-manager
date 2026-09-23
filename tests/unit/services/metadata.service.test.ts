@@ -150,6 +150,48 @@ describe('MetadataService', () => {
   });
 
   describe('refreshGame', () => {
+    it('uses exact-ID Nlib and preserves a package NACP name', async () => {
+      const gameId = insertGame('Package name');
+      const titleId = '0100AABBCCDD0000';
+      db.prepare(`INSERT INTO titles(game_id,title_id,base_title_id,type,display_name,name_source,provisional)
+        VALUES (?,?,?,'base','Package name','nacp',0)`).run(gameId,titleId,titleId);
+      let igdbCalls = 0;
+      const fetchImpl = (async (input: RequestInfo | URL): Promise<Response> => {
+        const url = requestUrl(input);
+        if (url.startsWith('https://api.nlib.cc/nx/')) return jsonResponse({
+          id:titleId,name:'Nlib name',description:'Nlib description',category:['Action'],
+          nsuId:'70010000000025',publisher:'Publisher',developer:'Developer',
+        });
+        igdbCalls += 1;
+        throw new Error('IGDB must not be called for a usable Nlib record');
+      }) as typeof fetch;
+      expect(await service({ fetchImpl }).refreshGame(gameId)).toBe(true);
+      expect(igdbCalls).toBe(0);
+      expect(getGame(db,gameId)).toMatchObject({ displayTitle:'Package name',
+        metadataProvider:'nlib',description:'Nlib description' });
+      expect(db.prepare('SELECT nsu_id FROM titles WHERE game_id=?').get(gameId))
+        .toMatchObject({ nsu_id:'70010000000025' });
+    });
+
+    it('falls back to IGDB when the exact Nlib ID is missing', async () => {
+      const gameId = insertGame('Fallback Game');
+      const titleId = '0100AABBCCDD0000';
+      db.prepare(`INSERT INTO titles(game_id,title_id,base_title_id,type,display_name,provisional)
+        VALUES (?,?,?,'base','Fallback Game',0)`).run(gameId,titleId,titleId);
+      let nlibCalls = 0;
+      const original = igdbStub();
+      const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        if (requestUrl(input).startsWith('https://api.nlib.cc/nx/')) {
+          nlibCalls += 1;
+          return jsonResponse({},404);
+        }
+        return original(input,init);
+      }) as typeof fetch;
+      expect(await service({ fetchImpl }).refreshGame(gameId)).toBe(true);
+      expect(nlibCalls).toBe(1);
+      expect(getGame(db,gameId)?.metadataProvider).toBe('igdb');
+    });
+
     it('never searches for or overwrites a locked game', async () => {
       const gameId = insertGame('Super Mario Odyssey', { locked: true });
       let requests = 0;

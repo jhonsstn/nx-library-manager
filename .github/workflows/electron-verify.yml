@@ -30,3 +30,12 @@ jobs:
 
       - name: Production build
         run: pnpm run build
+
+      - name: Package Windows app
+        run: pnpm exec electron-builder --win --x64 --dir --publish never
+
+      - name: Smoke test packaged app
+        shell: pwsh
+        run: |
+          & 'release/win-unpacked/Switch Game Catalog.exe' --smoke-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

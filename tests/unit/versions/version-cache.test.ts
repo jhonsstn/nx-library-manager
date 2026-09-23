@@ -22,6 +22,7 @@ const JSON_BODY = JSON.stringify({
   '0100A3A0149EC000': { '0': '2020-09-17', '131072': '2021-01-01' },
 });
 const TXT_BODY = ['id|name|version', '0100A3A0149EC800|Hades Update|262144'].join('\n');
+const PATCH_IDS = new Set(['0100A3A0149EC800']);
 
 /** The merged database both remote bodies produce. */
 const MERGED = {
@@ -122,7 +123,7 @@ describe('loadVersionRecords', () => {
     const paths = casePaths();
     writeFreshCache(paths, CACHED_JSON, CACHED_TXT);
 
-    expect(readCachedVersionRecords(paths)).toEqual(MERGED_CACHED);
+    expect(readCachedVersionRecords(paths, PATCH_IDS)).toEqual(MERGED_CACHED);
   });
 
   it('uses a fresh cache without fetching', async () => {
@@ -132,7 +133,7 @@ describe('loadVersionRecords', () => {
       throw new Error(`unexpected fetch: ${url}`);
     });
 
-    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl });
+    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, knownPatchIds: PATCH_IDS });
 
     expect(fetch.urls).toEqual([]);
     expect(result.refreshed).toBe(false);
@@ -147,7 +148,7 @@ describe('loadVersionRecords', () => {
     ageCacheFile(paths.versionsTxtFile, TITLEDB_CACHE_MAX_AGE_MS * 2);
     const fetch = remoteFetch();
 
-    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl });
+    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, knownPatchIds: PATCH_IDS });
 
     expect(fetch.urls).toEqual([TITLEDB_VERSIONS_URL, TITLEDB_VERSIONS_TXT_URL]);
     expect(result.refreshed).toBe(true);
@@ -162,7 +163,7 @@ describe('loadVersionRecords', () => {
     writeFreshCache(paths, CACHED_JSON, CACHED_TXT);
     const fetch = remoteFetch();
 
-    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, refresh: true });
+    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, refresh: true, knownPatchIds: PATCH_IDS });
 
     expect(fetch.urls).toEqual([TITLEDB_VERSIONS_URL, TITLEDB_VERSIONS_TXT_URL]);
     expect(result.refreshed).toBe(true);
@@ -177,6 +178,7 @@ describe('loadVersionRecords', () => {
     const result = await loadVersionRecords({
       paths,
       fetchImpl: fetch.impl,
+      knownPatchIds: PATCH_IDS,
       now: Date.now() + TITLEDB_CACHE_MAX_AGE_MS + 60_000,
     });
 
@@ -194,7 +196,7 @@ describe('loadVersionRecords', () => {
       throw new Error('offline');
     });
 
-    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl });
+    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, knownPatchIds: PATCH_IDS });
 
     expect(fetch.urls).toEqual([TITLEDB_VERSIONS_URL, TITLEDB_VERSIONS_TXT_URL]);
     expect(result.refreshed).toBe(false);
@@ -212,7 +214,7 @@ describe('loadVersionRecords', () => {
       new Response(url === TITLEDB_VERSIONS_URL ? '[]' : 'not|a|usable version', { status: 200 }),
     );
 
-    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, refresh: true });
+    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, refresh: true, knownPatchIds: PATCH_IDS });
 
     expect(result.refreshed).toBe(false);
     expect(result.error?.code).toBe('NETWORK_ERROR');
@@ -228,7 +230,7 @@ describe('loadVersionRecords', () => {
     ageCacheFile(paths.versionsTxtFile, TITLEDB_CACHE_MAX_AGE_MS * 2);
     const fetch = recordingFetch(async () => new Response('server exploded', { status: 500 }));
 
-    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl });
+    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, knownPatchIds: PATCH_IDS });
 
     expect(result.refreshed).toBe(false);
     expect(result.error?.code).toBe('NETWORK_ERROR');
@@ -241,7 +243,7 @@ describe('loadVersionRecords', () => {
     const paths = casePaths();
     const fetch = remoteFetch();
 
-    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl });
+    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, knownPatchIds: PATCH_IDS });
 
     expect(result.refreshed).toBe(true);
     expect(result.error).toBeNull();
@@ -258,7 +260,7 @@ describe('loadVersionRecords', () => {
       throw new Error('offline');
     });
 
-    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl });
+    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, knownPatchIds: PATCH_IDS });
 
     expect(result.versions).toEqual({});
     expect(result.refreshed).toBe(false);
@@ -272,7 +274,7 @@ describe('loadVersionRecords', () => {
       throw new Error(`unexpected fetch: ${url}`);
     });
 
-    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl });
+    const result = await loadVersionRecords({ paths, fetchImpl: fetch.impl, knownPatchIds: PATCH_IDS });
 
     expect(fetch.urls).toEqual([]);
     expect(result.error).toBeNull();

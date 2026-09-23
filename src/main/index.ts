@@ -9,6 +9,7 @@ import { createSafeStorageCipher } from './lifecycle/safe-cipher';
 import { ShutdownCoordinator } from './lifecycle/shutdown';
 import { ensureAppPaths, resolveAppPaths, type AppPaths } from './platform/paths';
 import { SettingsStore } from './settings/settings.store';
+import { ProdKeysStore } from './settings/prod-keys';
 import { PowerShellMtpAdapter } from './mtp/powershell-mtp.adapter';
 import { CatalogService } from './services/catalog.service';
 import { FileService } from './services/file.service';
@@ -25,6 +26,7 @@ import { rejectNewIpcWork } from './ipc/handle';
 import { resolveScanInput } from './ipc/scan.ipc';
 import { EVENTS } from '../shared/contracts/ipc';
 import { MTP_STATUS_REFRESH_MS } from '../shared/constants';
+import { runPackagedSmoke } from './smoke';
 
 interface AppState {
   paths: AppPaths;
@@ -72,7 +74,15 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   void app.whenReady().then(() => {
-    bootstrap();
+    if (process.argv.includes('--smoke-test')) {
+      void runPackagedSmoke().then(
+        () => { process.stdout.write('Package smoke passed\n'); app.exit(0); },
+        (error: unknown) => {
+          process.stderr.write(`Package smoke failed: ${error instanceof Error ? error.message : String(error)}\n`);
+          app.exit(1);
+        },
+      );
+    } else bootstrap();
   });
 }
 
@@ -89,6 +99,7 @@ function bootstrap(): void {
     logger.warn('settings.noSecretCipher', { platform: process.platform });
   }
   const settings = new SettingsStore({ paths, cipher });
+  const prodKeys = new ProdKeysStore(paths.userDataDir, cipher);
 
   const db = openDatabase(paths.databaseFile);
   try {
@@ -153,9 +164,17 @@ function bootstrap(): void {
   });
   const scanner = new ScannerService({
     db,
+    prodKeys,
     logger: logger.child('scanner'),
     onProgress: (event) => emit(EVENTS.scanProgress, event),
-    onCompleted: (event) => emit(EVENTS.scanCompleted, event),
+    onCompleted: (event) => {
+      emit(EVENTS.scanCompleted, event);
+      if (!event.cancelled && !event.error) void metadata.bulkRefresh({
+        onProgress: (progress) => emit(EVENTS.metadataBulkProgress, progress),
+      }).catch((error: unknown) => logger.warn('metadata.autoRefreshFailed', {
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    },
   });
   const appUpdate = new AppUpdateService({ currentVersion: app.getVersion() });
 
@@ -177,6 +196,7 @@ function bootstrap(): void {
     db,
     logger,
     settings,
+    prodKeys,
     catalog,
     scanner,
     metadata,
@@ -209,6 +229,12 @@ function bootstrap(): void {
   void versions.load().then(
     () => emit(EVENTS.versionsChanged, undefined),
     (error: unknown) => logger.warn('versions.loadFailed', { error: error instanceof Error ? error.message : String(error) }),
+  );
+  void versions.dlcIndex.refresh().then(
+    (changed) => { if (changed) { versions.loadCached(); emit(EVENTS.versionsChanged, undefined); } },
+    (error: unknown) => logger.warn('dlcIndex.refreshFailed', {
+      error: error instanceof Error ? error.message : String(error),
+    }),
   );
   if (currentSettings.autoRescanOnStartup && currentSettings.baseGamesFolder) {
     void scanner.start(resolveScanInput(currentSettings, {})).catch((error: unknown) => {

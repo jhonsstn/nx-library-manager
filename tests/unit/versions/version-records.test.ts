@@ -24,7 +24,8 @@ const VERSIONS_JSON_SAMPLE: Record<string, Record<string, string>> = {
   '0100A3A0149EC000': { '0': '2020-09-17', '131072': '2021-01-01' },
 };
 
-const parsedTxt = parseVersionsTxt(VERSIONS_TXT_SAMPLE);
+const parsedTxt = parseVersionsTxt(VERSIONS_TXT_SAMPLE,
+  new Set(['0100000000010800', '0100A3A0149EC800']));
 
 describe('parseVersionsTxt', () => {
   it('maps an update ID onto its base ID keeping the highest version seen', () => {
@@ -51,7 +52,7 @@ describe('parseVersionsTxt', () => {
   it('keeps a zero version and normalizes whitespace and case', () => {
     const text = [' 0100a3a0149ec800 |Hades Update| 131072 ', '0100000000000000|Game|0'].join('\n');
 
-    expect(parseVersionsTxt(text)).toEqual({
+    expect(parseVersionsTxt(text, new Set(['0100A3A0149EC800']))).toEqual({
       '0100A3A0149EC800': { '131072': '' },
       '0100A3A0149EC000': { '131072': '' },
       '0100000000000000': { '0': '' },
@@ -67,6 +68,22 @@ describe('parseVersionsTxt', () => {
     expect(parseVersionsTxt('0100000000000000|Game|-5')).toEqual({
       '0100000000000000': { '0': '' },
     });
+  });
+
+  it('does not map a DLC with an 0x800 suffix when CNMT identifies the actual patch', () => {
+    const records = parseVersionsTxt([
+      '0100AABBCCDD0800|Patch|131072',
+      '0100AABBCCDD1800|DLC|999999',
+    ].join('\n'), new Set(['0100AABBCCDD0800']));
+    expect(records['0100AABBCCDD0000']).toEqual({ '131072':'' });
+    expect(records['0100AABBCCDD1000']).toBeUndefined();
+    expect(records['0100AABBCCDD1800']).toEqual({ '999999':'' });
+  });
+
+  it('leaves patch and DLC IDs unassociated until the CNMT index is available', () => {
+    const records = parseVersionsTxt('0100AABBCCDD0800|Unknown type|999999');
+    expect(records['0100AABBCCDD0800']).toEqual({ '999999':'' });
+    expect(records['0100AABBCCDD0000']).toBeUndefined();
   });
 });
 
@@ -95,7 +112,8 @@ describe('baseIdFromUpdateId', () => {
   });
 
   it('stays exact for 64-bit IDs (no float rounding)', () => {
-    expect(baseIdFromUpdateId('FF00A3A0149EC801')).toBe('FF00A3A0149EC001');
+    expect(baseIdFromUpdateId('FF00A3A0149EC800')).toBe('FF00A3A0149EC000');
+    expect(baseIdFromUpdateId('FF00A3A0149EC801')).toBe('FF00A3A0149EC801');
   });
 });
 

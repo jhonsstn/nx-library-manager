@@ -14,6 +14,7 @@ import {
 import { getBaseFile, upsertBaseGameFile } from '@main/repositories/game-files.repository';
 import { assignManualMatch, getUpdate, listUnmatchedUpdates, upsertUpdate } from '@main/repositories/updates.repository';
 import { replaceScreenshots } from '@main/repositories/screenshots.repository';
+import { recordInspection } from '@main/repositories/title-catalog.repository';
 import { defaultAppSettings } from '@shared/schemas/settings';
 import { TEMP_ROOT } from '../../setup/vitest.setup';
 
@@ -63,6 +64,18 @@ function seed(): void {
     modifiedTime: 3000,
     fileType: 'NSP',
   });
+  recordInspection(db, {
+    path: `C:/games/Zelda [${TITLE_ID}][v65536].nsp`, size: 8_000_000_000,
+    mtime: 3000, parserVersion: 1, keysRevision: 1, error: null,
+    titles: [
+      { titleId: TITLE_ID, baseTitleId: TITLE_ID, type: 'base', rawVersion: 0,
+        name: null, publisher: null, source: 'cnmt' },
+      { titleId: '0100000000010800', baseTitleId: TITLE_ID, type: 'update', rawVersion: 65536,
+        name: null, publisher: null, source: 'cnmt' },
+      { titleId: '0100000000011000', baseTitleId: TITLE_ID, type: 'dlc', rawVersion: 999999,
+        name: 'Bonus content', publisher: null, source: 'cnmt' },
+    ],
+  });
   upsertUpdate(db, {
     gameId: null,
     filePath: 'C:/updates/Unknown [v131072].nsp',
@@ -85,6 +98,15 @@ beforeEach(async () => {
   // A fresh version cache avoids any network access during the test run.
   writeFileSync(paths.versionsJsonFile, JSON.stringify({ [TITLE_ID]: { '65536': '2020-01-01', '131072': '2021-01-01' } }));
   writeFileSync(paths.versionsTxtFile, 'id|name|version\n');
+  writeFileSync(join(paths.versionsCacheDir,'dlc-index.json'), JSON.stringify({
+    refreshedAt:new Date().toISOString(), entries:Array.from({ length:100 },(_,i) => ({
+      titleId:i===0 ? '0100000000011000' : i===1 ? '0100000000011001'
+        : `${i.toString(16).padStart(16,'0').toUpperCase()}`,
+      baseTitleId:TITLE_ID,name:i===0 ? 'Bonus content' : null,
+    })),
+    patchIds:['0100000000010800',...Array.from({ length:100 },(_,i) =>
+      (i+1000).toString(16).padStart(16,'0').toUpperCase())],
+  }));
 
   const versions = new VersionService({ db, paths });
   await versions.load();
@@ -115,7 +137,7 @@ describe('CatalogService.listGames', () => {
       coverDisplayUrl: 'https://images.igdb.com/igdb/image/upload/t_cover_big/hades.jpg',
     });
     expect(hades.baseFile?.filePath).toBe('C:/games/Hades.nsp');
-    // Zelda carries a title ID that TitleDB can compare against.
+    // The combined package contains a verified base ID and patch version.
     expect(zelda.hasNewerUpdate).toBe(true);
   });
 
@@ -160,6 +182,10 @@ describe('CatalogService.getGame', () => {
     expect(details.versionStatus.localVersion).toBe(65536);
     expect(details.versionStatus.latest).toEqual({ version: 131072, releaseDate: '2021-01-01' });
     expect(details.versionStatus.newer.map((entry) => entry.version)).toEqual([131072]);
+    expect(details.knownDlc?.find((entry) => entry.titleId === '0100000000011000'))
+      .toMatchObject({ name:'Bonus content',filePresent:true });
+    expect(details.knownDlc?.find((entry) => entry.titleId === '0100000000011001'))
+      .toMatchObject({ filePresent:false });
   });
 
   it('rejects unknown game ids with NOT_FOUND', () => {

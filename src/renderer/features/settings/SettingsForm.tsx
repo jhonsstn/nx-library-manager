@@ -92,6 +92,7 @@ export function SettingsForm() {
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatusDto | null>(null);
   const [updateCheckError, setUpdateCheckError] = useState<unknown>(null);
   const [checking, setChecking] = useState(false);
+  const [keysBusy, setKeysBusy] = useState(false);
 
   const stored = settings.data ?? null;
 
@@ -220,6 +221,31 @@ export function SettingsForm() {
 
       <section className="panel">
         <h2 className="panel__title">Scanning</h2>
+        <div className="stack">
+          <span className="dim">prod.keys: {stored.prodKeysConfigured ? 'Imported' : 'Not imported'}</span>
+          <div className="row row--wrap">
+            <Button disabled={keysBusy} onClick={() => {
+              setKeysBusy(true);
+              void getCatalogApi().settings.importProdKeys()
+                .then(async (imported) => {
+                  if (imported) {
+                    await settings.refetch();
+                    toast.success('prod.keys imported', 'The library is being rescanned.');
+                  }
+                })
+                .catch((error) => toast.error('Could not import prod.keys', messageOf(error)))
+                .finally(() => setKeysBusy(false));
+            }}>{stored.prodKeysConfigured ? 'Replace prod.keys' : 'Import prod.keys'}</Button>
+            {stored.prodKeysConfigured ? <Button disabled={keysBusy} onClick={() => {
+              setKeysBusy(true);
+              void getCatalogApi().settings.removeProdKeys()
+                .then(async () => { await settings.refetch(); toast.success('prod.keys removed'); })
+                .catch((error) => toast.error('Could not remove prod.keys', messageOf(error)))
+                .finally(() => setKeysBusy(false));
+            }}>Remove prod.keys</Button> : null}
+          </div>
+          <span className="dim">Keys stay encrypted in app data and are never included in catalog backups.</span>
+        </div>
         <CheckboxField
           label="Scan recursively"
           checked={draft.scanRecursively}
@@ -252,7 +278,7 @@ export function SettingsForm() {
       </section>
 
       <section className="panel">
-        <h2 className="panel__title">Metadata / IGDB</h2>
+        <h2 className="panel__title">Metadata / Nlib and IGDB fallback</h2>
         <TextField
           label="IGDB client ID"
           value={draft.igdbClientId}

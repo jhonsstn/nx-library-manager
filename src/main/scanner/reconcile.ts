@@ -184,7 +184,12 @@ export function reconcileLibrary(db: AppDatabase, input: ReconcileInput): Reconc
 function upsertBaseEntry(db: AppDatabase, entry: LibraryFileEntry): void {
   const cleaned = cleanTitle(entry.fileName);
   const displayTitle = cleaned || stemOf(entry.fileName);
-  const gameId = upsertGameByCleanedTitle(db, { displayTitle, cleanedTitle: cleaned || displayTitle });
+  const known = db.prepare(`SELECT t.game_id FROM local_files lf
+    JOIN file_titles ft ON ft.local_file_id=lf.id JOIN titles t ON t.id=ft.title_id
+    WHERE lf.file_path=? AND t.type='base' AND t.game_id IS NOT NULL LIMIT 1`)
+    .get(entry.path) as { game_id: number } | undefined;
+  const gameId = known?.game_id ?? upsertGameByCleanedTitle(db,
+    { displayTitle, cleanedTitle: cleaned || displayTitle });
   upsertBaseGameFile(db, {
     gameId,
     filePath: entry.path,

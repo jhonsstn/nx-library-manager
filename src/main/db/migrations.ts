@@ -111,7 +111,83 @@ const initialSchema: Migration = {
   },
 };
 
-export const MIGRATIONS: Migration[] = [initialSchema];
+/** Keep the legacy game IDs and their dependent rows while introducing physical
+ * files and contained titles as independent records. Legacy tables remain as a
+ * compatibility projection until all callers use the new relations. */
+const titleCatalog: Migration = {
+  version: 2,
+  name: 'title-file-catalog',
+  up: (db) => {
+    db.exec(`
+      CREATE TABLE titles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        game_id INTEGER REFERENCES games(id) ON DELETE SET NULL,
+        legacy_update_id INTEGER,
+        title_id TEXT UNIQUE,
+        base_title_id TEXT,
+        type TEXT NOT NULL CHECK(type IN ('base','update','dlc')),
+        display_name TEXT NOT NULL,
+        name_source TEXT NOT NULL DEFAULT 'filename',
+        nsu_id TEXT,
+        publisher TEXT,
+        developer TEXT,
+        icon_url TEXT,
+        banner_url TEXT,
+        metadata_provider TEXT,
+        description TEXT,
+        release_date TEXT,
+        genres TEXT,
+        provisional INTEGER NOT NULL DEFAULT 1,
+        UNIQUE(game_id, type, title_id)
+      );
+      CREATE TABLE local_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_path TEXT NOT NULL UNIQUE,
+        file_name TEXT NOT NULL,
+        file_extension TEXT NOT NULL,
+        file_size INTEGER NOT NULL,
+        modified_time REAL NOT NULL,
+        inspection_version INTEGER,
+        keys_revision INTEGER,
+        inspection_error TEXT
+      );
+      CREATE TABLE file_titles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        local_file_id INTEGER NOT NULL REFERENCES local_files(id) ON DELETE CASCADE,
+        title_id INTEGER NOT NULL REFERENCES titles(id) ON DELETE CASCADE,
+        raw_version INTEGER,
+        detection_source TEXT NOT NULL CHECK(detection_source IN ('cnmt','nca-header','filename','migration','manual')),
+        UNIQUE(local_file_id, title_id)
+      );
+      CREATE INDEX idx_titles_game_id ON titles(game_id);
+      CREATE INDEX idx_titles_base_title_id ON titles(base_title_id);
+      CREATE INDEX idx_file_titles_title_id ON file_titles(title_id);
+    `);
+    db.exec(`
+      INSERT INTO titles(game_id, type, display_name, name_source, metadata_provider,
+                         description, publisher, developer, release_date, genres, provisional)
+      SELECT id, 'base', display_title, 'migration', metadata_provider,
+             description, publisher, developer, release_date, genres, 1 FROM games;
+      INSERT OR IGNORE INTO local_files(file_path, file_name, file_extension, file_size, modified_time)
+      SELECT file_path, file_name, file_extension, file_size, modified_time FROM game_files;
+      INSERT OR IGNORE INTO local_files(file_path, file_name, file_extension, file_size, modified_time)
+      SELECT file_path, file_name, lower(substr(file_name, length(file_name)-3)), file_size, modified_time FROM updates;
+      INSERT INTO file_titles(local_file_id, title_id, detection_source)
+      SELECT lf.id, t.id, 'migration' FROM game_files gf
+      JOIN local_files lf ON lf.file_path = gf.file_path
+      JOIN titles t ON t.game_id = gf.game_id AND t.type = 'base';
+      INSERT INTO titles(game_id, legacy_update_id, type, display_name, name_source, provisional)
+      SELECT game_id, id, CASE WHEN lower(file_name) LIKE '%dlc%' THEN 'dlc' ELSE 'update' END,
+        file_name, 'migration', 1 FROM updates;
+      INSERT INTO file_titles(local_file_id, title_id, detection_source)
+      SELECT lf.id, t.id, 'migration' FROM updates u
+      JOIN local_files lf ON lf.file_path = u.file_path
+      JOIN titles t ON t.legacy_update_id = u.id;
+    `);
+  },
+};
+
+export const MIGRATIONS: Migration[] = [initialSchema, titleCatalog];
 
 export function appliedVersions(db: AppDatabase): number[] {
   db.exec(`
@@ -147,7 +223,7 @@ export function runMigrations(
 
   // A brand-new database has no user data to protect; backups begin with the
   // first Electron-to-Electron upgrade.
-  const backupFile = done.size === 0 ? null : createBackup(databaseFile);
+  const backupFile = done.size === 0 ? null : createDatabaseBackup(db, databaseFile);
   const applied: number[] = [];
   const record = db.prepare('INSERT INTO schema_migrations(version, name) VALUES (?, ?)');
   for (const migration of pending) {
@@ -166,5 +242,16 @@ export function createBackup(databaseFile: string, now = new Date()): string | n
   if (!existsSync(databaseFile)) return null;
   const target = backupFileName(databaseFile, now);
   copyFileSync(databaseFile, target);
+  return target;
+}
+
+/** SQLite creates a consistent snapshot even when the live database uses WAL. */
+function createDatabaseBackup(db: AppDatabase, databaseFile: string): string | null {
+  if (!existsSync(databaseFile)) return null;
+  const base = backupFileName(databaseFile);
+  let target = base;
+  let counter = 1;
+  while (existsSync(target)) target = `${base}-${counter++}`;
+  db.exec(`VACUUM INTO '${target.replaceAll("'", "''")}'`);
   return target;
 }

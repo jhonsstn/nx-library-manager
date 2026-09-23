@@ -38,17 +38,18 @@ export function baseIdFromUpdateId(titleId: string): string {
   if (!match) return titleId;
   let value = BigInt(`0x${match[2]}`);
   if (match[1] === '-') value = -value;
-  if ((value & UPDATE_ID_BIT) !== 0n) value -= UPDATE_ID_BIT;
+  if ((value & 0xFFFn) === UPDATE_ID_BIT) value -= UPDATE_ID_BIT;
   return formatHex16(value);
 }
 
 /**
  * Parses the `id|name|version` table published as `versions.txt`.
  *
- * Lines that are empty or part of the header are skipped, and the maximum
- * version seen wins for both the update ID and its base ID.
+ * Lines that are empty or part of the header are skipped. An update is linked
+ * to its base only when the CNMT index confirms its type; an ID suffix alone
+ * can also belong to DLC.
  */
-export function parseVersionsTxt(text: string): VersionRecords {
+export function parseVersionsTxt(text: string, knownPatchIds?: ReadonlySet<string>): VersionRecords {
   const rows = new Map<string, number>();
   // Python accumulates with `max(rows.get(id, 0), version)`, so the floor is 0.
   const remember = (titleId: string, version: number) => {
@@ -61,11 +62,12 @@ export function parseVersionsTxt(text: string): VersionRecords {
     if (parts.length < 3) continue;
     const titleId = parts[0].trim().toUpperCase();
     const versionText = parts[2].trim();
-    if (titleId.length !== 16 || !versionText) continue;
+    if (!/^[0-9A-F]{16}$/.test(titleId) || !versionText) continue;
     const version = toIntegerOrNull(versionText);
     if (version === null) continue;
     remember(titleId, version);
-    remember(baseIdFromUpdateId(titleId), version);
+    if (knownPatchIds?.has(titleId))
+      remember(baseIdFromUpdateId(titleId), version);
   }
 
   const records: VersionRecords = {};

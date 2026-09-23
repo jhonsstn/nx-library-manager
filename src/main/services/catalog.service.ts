@@ -17,9 +17,8 @@ import type {
   ListUpdatesInput,
 } from '../../shared/contracts/api';
 import { appError } from '../../shared/errors/app-error';
-import { rawVersionFromVersionText } from '../../shared/format/versions';
 import { displayImageUrl } from '../platform/catalog-image';
-import { detectVersion, extractTitleId } from '../scanner/filename-parser';
+import { detectVersion } from '../scanner/filename-parser';
 import { updateFileGroup } from '../scanner/classify-file';
 import {
   allGameTitles,
@@ -45,6 +44,7 @@ import {
 } from '../repositories/updates.repository';
 import { listScreenshots } from '../repositories/screenshots.repository';
 import type { VersionService } from './version.service';
+import { contentsForGame, type ContainedTitle } from '../repositories/title-catalog.repository';
 
 export interface CatalogServiceOptions {
   db: AppDatabase;
@@ -102,8 +102,9 @@ export class CatalogService {
     const baseFile = getBaseFile(this.db, gameId);
     const updates = listUpdatesForGame(this.db, gameId);
     const summary = this.toSummary(record, baseFile, updates);
-    const localVersions = localVersionsFor(baseFile, updates);
-    const titleId = baseFile ? extractTitleId(baseFile.fileName) : '';
+    const contents = contentsForGame(this.db, gameId);
+    const titleId = verifiedBaseTitleId(contents);
+    const localVersions = verifiedPatchVersions(contents,titleId);
     const screenshots = listScreenshots(this.db, gameId, 8).map(
       (row): ScreenshotDto => ({
         id: row.id,
@@ -115,6 +116,10 @@ export class CatalogService {
       }),
     );
 
+    const localDlcRows = (titleId ? this.db.prepare(`SELECT DISTINCT t.title_id FROM titles t
+      JOIN file_titles ft ON ft.title_id=t.id WHERE t.type='dlc' AND t.base_title_id=?`)
+      .all(titleId) : []) as Array<{ title_id: string }>;
+    const localDlcIds = new Set(localDlcRows.map((row) => row.title_id));
     return {
       ...summary,
       description: record.description,
@@ -126,7 +131,13 @@ export class CatalogService {
       files: listGameFiles(this.db, gameId),
       updates: updates.map((update) => toUpdateDto(update)),
       screenshots,
-      versionStatus: this.versions.statusForTitleId(titleId, localVersions),
+      versionStatus: this.verifiedVersionStatus(titleId, contents),
+      containedTitles: contents,
+      knownDlc: titleId ? this.versions.dlcIndex.forBase(titleId).map((entry) => ({
+        titleId: entry.titleId, name: entry.name ?? entry.titleId,
+        filePresent: localDlcIds.has(entry.titleId),
+      })) : [],
+      knownDlcRefreshedAt: this.versions.dlcIndex.refreshedAt,
       installed: this.versions.installedStatus({
         gameId,
         baseFilePath: baseFile ? baseFile.filePath : null,
@@ -218,8 +229,14 @@ export class CatalogService {
   }
 
   private toSummary(record: GameRecord, baseFile: GameFileRecord | null, updates: UpdateRecord[]): GameSummaryDto {
-    const localVersions = localVersionsFor(baseFile, updates);
-    const titleId = baseFile ? extractTitleId(baseFile.fileName) : '';
+    const contents = contentsForGame(this.db, record.id);
+    const titleId = verifiedBaseTitleId(contents);
+    const status = this.verifiedVersionStatus(titleId, contents);
+    const updatePaths = new Set(contents.filter((item) => item.type === 'update').map((item) => item.filePath));
+    for (const update of updates) {
+      if (!contents.some((item) => item.filePath === update.filePath)
+        && updateFileGroup(update.fileName) === 'Updates') updatePaths.add(update.filePath);
+    }
     return {
       id: record.id,
       displayTitle: record.displayTitle,
@@ -233,10 +250,38 @@ export class CatalogService {
       coverImageUrl: record.coverImageUrl,
       coverDisplayUrl: displayImageUrl(record.coverImagePath, record.coverImageUrl, 'covers'),
       baseFile: baseFile as GameFileDto | null,
-      updateCount: updates.length,
-      hasNewerUpdate: titleId !== '' && this.versions.hasNewerUpdate(titleId, localVersions),
+      updateCount: updatePaths.size,
+      hasNewerUpdate: Boolean(status.missingUpdate),
+      titleId: titleId || null,
     };
   }
+
+  private verifiedVersionStatus(titleId: string, contents: ContainedTitle[]) {
+    const patches = contents.filter((item) => item.type === 'update'
+      && (!item.baseTitleId || item.baseTitleId === titleId));
+    const base = contents.find((item) => item.type === 'base' && !item.provisional);
+    const uncertain = !this.versions.dlcIndex.patchIds
+      ? 'TitleDB title-type index is unavailable.'
+      : !titleId || !base || base.source !== 'cnmt'
+      ? 'Base title has not been verified from CNMT.'
+      : patches.some((item) => item.provisional || item.rawVersion === null)
+        ? 'A local patch version could not be verified.' : null;
+    const localVersions = verifiedPatchVersions(contents,titleId);
+    const status = this.versions.statusForTitleId(titleId, localVersions);
+    if (uncertain || !status.latest) return { ...status, kind: 'unknown' as const,
+      newer: [], missingUpdate: null, uncertainty: uncertain ?? 'TitleDB has no release data.' };
+    return { ...status, missingUpdate: status.newer[0] ?? null, uncertainty: null };
+  }
+}
+
+function verifiedBaseTitleId(contents: ContainedTitle[]): string {
+  return contents.find((item) => item.type === 'base' && !item.provisional)?.titleId ?? '';
+}
+
+function verifiedPatchVersions(contents: ContainedTitle[], titleId: string): number[] {
+  return contents.filter((item) => item.type === 'update' && item.baseTitleId === titleId
+      && !item.provisional && item.rawVersion !== null)
+    .map((item) => item.rawVersion as number);
 }
 
 function groupUpdates(db: AppDatabase): Map<number, UpdateRecord[]> {
@@ -248,13 +293,6 @@ function groupUpdates(db: AppDatabase): Map<number, UpdateRecord[]> {
     else grouped.set(row.gameId, [row]);
   }
   return grouped;
-}
-
-/** Ports `file_version_number` over the base file plus every update file name. */
-function localVersionsFor(baseFile: GameFileRecord | null, updates: UpdateRecord[]): number[] {
-  const versions = [baseFile ? rawVersionFromVersionText(detectVersion(baseFile.fileName)) : 0];
-  for (const update of updates) versions.push(rawVersionFromVersionText(detectVersion(update.fileName)));
-  return versions;
 }
 
 function toUpdateDto(update: UpdateRecord): UpdateFileDto {

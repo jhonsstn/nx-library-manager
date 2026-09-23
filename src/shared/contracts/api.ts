@@ -135,6 +135,8 @@ export interface SwitchCatalogApi {
   settings: {
     get(): Promise<PublicSettingsDto>;
     update(input: SettingsUpdateInput): Promise<PublicSettingsDto>;
+    importProdKeys(): Promise<boolean>;
+    removeProdKeys(): Promise<void>;
   };
 
   app: {

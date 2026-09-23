@@ -20,7 +20,7 @@ async function createHarness(overrides: Partial<AppSettings> = {}): Promise<{
   settings: AppSettings;
 }> {
   const dir = mkdtempSync(join(TEMP_ROOT, 'case-'));
-  const paths = resolveAppPaths(dir);
+  const paths = resolveAppPaths(dir, dir);
   ensureAppPaths(paths);
   const db = openDatabase(paths.databaseFile);
   runMigrations(db, paths.databaseFile);
@@ -116,7 +116,7 @@ describe('HttpServerService', () => {
     const running = await first.service.start();
 
     const dir = mkdtempSync(join(TEMP_ROOT, 'case-'));
-    const paths = resolveAppPaths(dir);
+    const paths = resolveAppPaths(dir, dir);
     ensureAppPaths(paths);
     const db = openDatabase(paths.databaseFile);
     runMigrations(db, paths.databaseFile);

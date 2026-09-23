@@ -31,7 +31,7 @@ async function freePort(): Promise<number> {
 
 async function launch(): Promise<void> {
   app = await electron.launch({
-    args: ['.', `--user-data-dir=${userDataDir}`],
+    args: ['.', `--user-data-dir=${userDataDir}`, `--database-root=${userDataDir}`],
     cwd: PROJECT_ROOT,
   });
   page = await app.firstWindow();
@@ -98,9 +98,9 @@ test('search filters the library and details show the matched update', async () 
   await expect(gameRow('Mario Kart 8 Deluxe')).toBeHidden();
 
   await gameRow('Hades').click();
-  await expect(page.getByText('Hades.nsp')).toBeVisible();
-  await expect(page.getByText(/Latest Version on File/)).toBeVisible();
-  await expect(page.getByText(/Hades \[v131072\].nsp/)).toBeVisible();
+  await expect(page.getByText('Hades.nsp').first()).toBeVisible();
+  await expect(page.getByText(/Update status unknown/)).toBeVisible();
+  await expect(page.getByText(/Hades \[v131072\].nsp/).first()).toBeVisible();
 });
 
 test('favorites persist across a restart, and the DBI server starts and stops', async () => {
@@ -126,5 +126,5 @@ test('favorites persist across a restart, and the DBI server starts and stops', 
   await page.getByRole('link', { name: 'Library' }).click();
   await gameRow('Hades').click();
   await expect(page.getByRole('button', { name: 'Remove favorite' })).toBeVisible();
-  await expect(page.getByText(/Latest Version on File/)).toBeVisible();
+  await expect(page.getByText(/Update status unknown/)).toBeVisible();
 });

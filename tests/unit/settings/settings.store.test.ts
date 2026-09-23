@@ -23,7 +23,7 @@ const cipher: SecretCipher = {
 
 function makeStore(): { dir: string; paths: AppPaths; store: SettingsStore } {
   const dir = mkdtempSync(join(TEMP_ROOT, 'case-'));
-  const paths = resolveAppPaths(dir);
+  const paths = resolveAppPaths(dir, dir);
   const store = new SettingsStore({ paths, cipher, now: () => FIXED_NOW });
   return { dir, paths, store };
 }

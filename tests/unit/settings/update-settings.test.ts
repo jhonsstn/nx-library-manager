@@ -11,7 +11,7 @@ import { TEMP_ROOT } from '../../setup/vitest.setup';
 describe('updateSettingsTransactional', () => {
   it('restores settings and the previous server after an occupied-port failure', async () => {
     const dir = mkdtempSync(join(TEMP_ROOT, 'settings-transaction-'));
-    const paths = resolveAppPaths(dir);
+    const paths = resolveAppPaths(dir, dir);
     const settings = new SettingsStore({ paths });
     settings.update({ httpServerEnabled: true, httpServerPort: 8000 });
     let runningPort = 8000;
@@ -38,7 +38,7 @@ describe('updateSettingsTransactional', () => {
 
   it('does not reconfigure the server for unrelated settings', async () => {
     const dir = mkdtempSync(join(TEMP_ROOT, 'settings-transaction-'));
-    const settings = new SettingsStore({ paths: resolveAppPaths(dir) });
+    const settings = new SettingsStore({ paths: resolveAppPaths(dir, dir) });
     const applySettings = vi.fn();
 
     await updateSettingsTransactional(

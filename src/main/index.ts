@@ -8,6 +8,7 @@ import { createMainWindow, createRecoveryWindow } from './lifecycle/window';
 import { createSafeStorageCipher } from './lifecycle/safe-cipher';
 import { ShutdownCoordinator } from './lifecycle/shutdown';
 import { ensureAppPaths, resolveAppPaths, type AppPaths } from './platform/paths';
+import { resolveDatabaseRoot } from './platform/database-root';
 import { SettingsStore } from './settings/settings.store';
 import { ProdKeysStore } from './settings/prod-keys';
 import { PowerShellMtpAdapter } from './mtp/powershell-mtp.adapter';
@@ -89,7 +90,16 @@ if (!app.requestSingleInstanceLock()) {
 function bootstrap(): void {
   app.setAppUserModelId('com.switchgamecatalog.app');
 
-  const paths = resolveAppPaths(app.getPath('userData'));
+  const developmentOverride = process.argv.find((arg) => arg.startsWith('--database-root='))?.slice('--database-root='.length);
+  const databaseRoot = resolveDatabaseRoot({
+    isPackaged: app.isPackaged,
+    appPath: app.getAppPath(),
+    executablePath: app.getPath('exe'),
+    platform: process.platform,
+    portableExecutableDir: process.env.PORTABLE_EXECUTABLE_DIR,
+    developmentOverride,
+  });
+  const paths = resolveAppPaths(app.getPath('userData'), databaseRoot);
   ensureAppPaths(paths);
   const logger = createLogger({ logsDir: paths.logsDir, level: app.isPackaged ? 'info' : 'debug' });
 
@@ -101,8 +111,9 @@ function bootstrap(): void {
   const settings = new SettingsStore({ paths, cipher });
   const prodKeys = new ProdKeysStore(paths.userDataDir, cipher);
 
-  const db = openDatabase(paths.databaseFile);
+  let db: AppDatabase | null = null;
   try {
+    db = openDatabase(paths.databaseFile);
     const result = runMigrations(db, paths.databaseFile);
     if (result.applied.length > 0) {
       logger.info('db.migrated', { versions: result.applied, backup: result.backupFile });

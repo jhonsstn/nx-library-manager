@@ -76,7 +76,7 @@ describe('MetadataService', () => {
 
   beforeEach(() => {
     dir = mkdtempSync(join(TEMP_ROOT, 'case-'));
-    paths = resolveAppPaths(dir);
+    paths = resolveAppPaths(dir, dir);
     ensureAppPaths(paths);
     db = openDatabase(paths.databaseFile);
     runMigrations(db, paths.databaseFile);

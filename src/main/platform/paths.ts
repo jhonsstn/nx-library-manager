@@ -4,8 +4,8 @@ import { join, resolve } from 'node:path';
 /**
  * User-data layout owned by the Electron app.
  *
- * Electron takes `userDataDir` from `app.getPath('userData')`; keeping the
- * resolution pure means path handling stays testable without Electron.
+ * Electron takes `userDataDir` from `app.getPath('userData')`. The catalog
+ * database instead lives in the app's root directory.
  */
 export interface AppPaths {
   userDataDir: string;
@@ -21,12 +21,12 @@ export interface AppPaths {
   serverLogFile: string;
 }
 
-export function resolveAppPaths(userDataDir: string): AppPaths {
+export function resolveAppPaths(userDataDir: string, databaseRoot: string): AppPaths {
   const root = resolve(userDataDir);
   const cacheDir = join(root, 'cache');
   return {
     userDataDir: root,
-    databaseFile: join(root, 'library.sqlite3'),
+    databaseFile: join(resolve(databaseRoot), 'library.sqlite3'),
     settingsFile: join(root, 'settings.json'),
     logsDir: join(root, 'logs'),
     cacheDir,

@@ -82,7 +82,7 @@ describe('IgdbClient', () => {
 
   beforeEach(() => {
     dir = mkdtempSync(join(TEMP_ROOT, 'case-'));
-    const paths = resolveAppPaths(dir);
+    const paths = resolveAppPaths(dir, dir);
     ensureAppPaths(paths);
     db = openDatabase(paths.databaseFile);
     runMigrations(db, paths.databaseFile);

@@ -3,7 +3,7 @@
 ## Repository layout
 
 ```text
-SwitchGameCatalog/
+switch-game-catalog/
 ├── package.json
 ├── electron-builder.yml
 ├── vite.config.ts

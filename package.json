@@ -1,7 +1,7 @@
 {
   "name": "switch-game-catalog",
   "productName": "Switch Game Catalog",
-  "version": "1.0.0-electron-beta.1",
+  "version": "0.1.0",
   "description": "Local desktop catalog for personal Nintendo Switch game files.",
   "author": {
     "name": "Switch Game Catalog contributors"

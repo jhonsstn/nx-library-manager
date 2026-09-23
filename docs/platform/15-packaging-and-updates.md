@@ -63,8 +63,8 @@ If added later:
 Use semantic versioning where possible:
 
 ```text
-1.0.0-electron-beta.1
-1.0.0-electron-beta.2
+0.1.0
+0.2.0
 1.0.0
 ```
 

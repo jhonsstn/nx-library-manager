@@ -68,6 +68,11 @@ describe('isNewerVersion', () => {
 });
 
 describe('AppUpdateService.checkLatestRelease', () => {
+  it('checks releases from this repository', () => {
+    expect(RELEASES_API_URL).toBe('https://api.github.com/repos/jhonsstn/switch-game-catalog/releases/latest');
+    expect(RELEASES_PAGE_URL).toBe('https://github.com/jhonsstn/switch-game-catalog/releases');
+  });
+
   it('reports a newer release', async () => {
     const { service, recorded } = serviceWith(
       jsonResponse({ tag_name: 'v1.2.0', name: 'Electron beta 2', html_url: 'https://example.test/rel/1.2.0' }),

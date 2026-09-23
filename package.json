@@ -1,7 +1,7 @@
 {
   "name": "nx-library-manager",
   "productName": "NX Library Manager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local desktop catalog for personal Nintendo Switch game files.",
   "author": {
     "name": "NX Library Manager contributors"

@@ -157,9 +157,17 @@ export class CatalogService {
     const knownIds = new Set(knownDlc.map((entry) => entry.titleId));
     const localDlc: KnownDlcDto[] = [...new Set(localDlcRows.map((row) => row.title_id))]
       .filter((id) => !knownIds.has(id)).map((id) => {
-        const row = localDlcRows.find((item) => item.title_id === id)!;
-        return { titleId: id, name: row.display_name || id,
-          nameSource: row.name_source === 'nacp' ? 'package' : 'filename',
+        const local = localDlcRows.filter((row) => row.title_id === id);
+        const packageName = local.find((row) => row.name_source === 'nacp'
+          && !sameTitleName(row.display_name, baseName))?.display_name;
+        const filenameName = local.map((row) => {
+          const embeddedId = extractTitleId(row.file_name);
+          return embeddedId && embeddedId !== id ? null : dlcNameFromFilename(row.file_name);
+        }).find((name) => name !== null);
+        const storedName = local.find((row) => row.display_name
+          && !sameTitleName(row.display_name, baseName))?.display_name;
+        return { titleId: id, name: packageName ?? filenameName ?? storedName ?? id,
+          nameSource: packageName ? 'package' : (filenameName || storedName) ? 'filename' : 'title-id',
           filePresent: true, switchStatus: consolePresence(inventory, id) };
       });
     return {

@@ -275,6 +275,26 @@ describe('CatalogService.getGame', () => {
       .toMatchObject({ name: 'Bonus content', nameSource: 'titledb' });
   });
 
+  it('uses descriptive filenames for local DLC missing from TitleDB when NACP repeats the game name', () => {
+    for (const [suffix, dlcName] of [
+      ['1002', 'Pilgrim Pack'], ['1003', 'Sinful Pack'], ['1004', 'Woolhaven'],
+    ]) {
+      const id = `010000000001${suffix}`;
+      const name = `Zelda [DLC ${dlcName}] [${id}][v0].nsp`;
+      recordInspection(db, {
+        path: `C:/updates/${name}`, size: 100, mtime: Number.parseInt(suffix, 16),
+        parserVersion: 1, keysRevision: 1, error: null,
+        titles: [{ titleId: id, baseTitleId: TITLE_ID, type: 'dlc', rawVersion: 0,
+          name: 'Zelda', publisher: null, source: 'cnmt' }],
+      });
+    }
+    expect(catalog.getGame(2).localDlc).toEqual(expect.arrayContaining([
+      expect.objectContaining({ titleId: '0100000000011002', name: 'Pilgrim Pack', nameSource: 'filename' }),
+      expect.objectContaining({ titleId: '0100000000011003', name: 'Sinful Pack', nameSource: 'filename' }),
+      expect.objectContaining({ titleId: '0100000000011004', name: 'Woolhaven', nameSource: 'filename' }),
+    ]));
+  });
+
   it('prefers a specific package name over a filename and rejects a conflicting filename ID', () => {
     const wrongFile = 'Zelda [DLC Wrong Costume] [0100000000011002][v0].nsp';
     recordInspection(db, {

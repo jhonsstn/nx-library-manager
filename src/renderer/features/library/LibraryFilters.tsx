@@ -1,4 +1,4 @@
-import type { ScanProgressDto } from '@shared/types/domain';
+import type { MtpInventoryDto, ScanProgressDto } from '@shared/types/domain';
 import { Button } from '@renderer/components/Button';
 import { ProgressBar } from '@renderer/components/Feedback';
 
@@ -15,6 +15,10 @@ export interface LibraryFiltersProps {
   onNeedsReviewChange: (value: boolean) => void;
   needsUpdate: boolean;
   onNeedsUpdateChange: (value: boolean) => void;
+  readyToInstall: boolean;
+  onReadyToInstallChange: (value: boolean) => void;
+  inventory: MtpInventoryDto | null;
+  onRefreshInventory: () => void;
   showHidden: boolean;
   onShowHiddenChange: (value: boolean) => void;
   scanProgress: ScanProgressDto | null;
@@ -48,6 +52,10 @@ export function LibraryFilters({
   onNeedsReviewChange,
   needsUpdate,
   onNeedsUpdateChange,
+  readyToInstall,
+  onReadyToInstallChange,
+  inventory,
+  onRefreshInventory,
   showHidden,
   onShowHiddenChange,
   scanProgress,
@@ -105,6 +113,11 @@ export function LibraryFilters({
           Needs Update?
         </label>
         <label className="checkbox">
+          <input type="checkbox" checked={readyToInstall} disabled={inventory?.state !== 'ready'}
+            onChange={(event) => onReadyToInstallChange(event.target.checked)} />
+          Ready to install
+        </label>
+        <label className="checkbox">
           <input
             type="checkbox"
             checked={showHidden}
@@ -113,6 +126,15 @@ export function LibraryFilters({
           Hidden games only
         </label>
         <span className="toolbar__spacer" />
+        <span className="dim" role="status">{inventory?.state === 'ready'
+          ? `Switch checked ${inventory.checkedAt?.slice(11, 16) ?? ''}`
+          : inventory?.state === 'scanning' ? 'Checking Switch…'
+            : inventory?.state === 'partial' ? 'Switch inventory incomplete'
+              : inventory?.state === 'unavailable' || inventory?.state === 'error'
+                ? 'Switch inventory unavailable' : 'Switch inventory disconnected'}</span>
+        <Button onClick={onRefreshInventory} disabled={inventory?.state === 'scanning'}>
+          Refresh Switch
+        </Button>
         <Button onClick={onRescan} disabled={scanning}>
           Rescan Library
         </Button>

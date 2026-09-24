@@ -34,6 +34,7 @@ export const IPC = {
     moveFile: 'files:moveFile',
   },
   install: {
+    preview: 'install:preview',
     create: 'install:create',
     cancel: 'install:cancel',
     retryFailed: 'install:retryFailed',
@@ -42,6 +43,8 @@ export const IPC = {
   mtp: {
     getStatus: 'mtp:getStatus',
     refresh: 'mtp:refresh',
+    getInventory: 'mtp:getInventory',
+    refreshInventory: 'mtp:refreshInventory',
   },
   httpServer: {
     getStatus: 'httpServer:getStatus',
@@ -68,6 +71,7 @@ export const EVENTS = {
   metadataBulkProgress: 'event:metadata:bulkProgress',
   installChanged: 'event:install:changed',
   mtpStatusChanged: 'event:mtp:statusChanged',
+  mtpInventoryChanged: 'event:mtp:inventoryChanged',
   httpServerStatusChanged: 'event:httpServer:statusChanged',
   versionsChanged: 'event:versions:changed',
   shutdownStatusChanged: 'event:shutdown:statusChanged',

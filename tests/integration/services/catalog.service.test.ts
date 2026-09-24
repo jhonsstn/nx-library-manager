@@ -122,6 +122,40 @@ afterEach(() => {
 });
 
 describe('CatalogService.listGames', () => {
+  it('filters only verified local content missing from a complete Switch inventory', () => {
+    const versions = new VersionService({ db, paths });
+    versions.loadCached();
+    const live = new CatalogService({ db, versions, settings: () => defaultAppSettings(),
+      inventory: () => ({ state: 'ready', deviceId: 'switch-1', revision: 1,
+        checkedAt: new Date().toISOString(), unidentifiedFiles: 0, message: null,
+        titles: [{ titleId: TITLE_ID, type: 'base', rawVersion: 0 }] }),
+    });
+    expect(live.listGames({ readyToInstall: true }).items.map((game) => game.displayTitle))
+      .toEqual(['Zelda']);
+    expect(live.getGame(2).switchStatus).toMatchObject({ base: 'installed',
+      update: 'not-installed', localContentReady: true });
+    expect(live.getGame(2).knownDlc?.find((item) => item.titleId === '0100000000011000'))
+      .toMatchObject({ filePresent: true, switchStatus: 'not-installed' });
+  });
+
+  it('shows verified local DLC even when the TitleDB index has no entry', () => {
+    const path = 'C:/updates/Zelda extra pack.nsp';
+    upsertUpdate(db, { gameId: 2, filePath: path, fileName: 'Zelda extra pack.nsp',
+      detectedVersion: '', fileSize: 1000, modifiedTime: 5000, matchConfidence: 1 });
+    recordInspection(db, { path, size: 1000, mtime: 5000, parserVersion: 1, keysRevision: 1,
+      error: null, titles: [{ titleId: '0100000000011002', baseTitleId: TITLE_ID,
+        type: 'dlc', rawVersion: 0, name: 'Extra pack', publisher: null, source: 'cnmt' }] });
+    const versions = new VersionService({ db, paths });
+    versions.loadCached();
+    const live = new CatalogService({ db, versions, settings: () => defaultAppSettings(),
+      inventory: () => ({ state: 'ready', deviceId: 'switch-1', revision: 1,
+        checkedAt: new Date().toISOString(), unidentifiedFiles: 0, message: null,
+        titles: [{ titleId: TITLE_ID, type: 'base', rawVersion: 0 }] }),
+    });
+    expect(live.getGame(2).localDlc).toContainEqual({ titleId: '0100000000011002',
+      name: 'Extra pack', nameSource: 'package', filePresent: true, switchStatus: 'not-installed' });
+  });
+
   it('returns summaries ordered by title with version state per game', () => {
     const page = catalog.listGames();
     expect(page.total).toBe(2);

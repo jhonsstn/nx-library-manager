@@ -24,6 +24,17 @@ export interface MtpStatus {
   storages: MtpStorageDestination[];
   checkedAt: string;
   error: AppErrorDto | null;
+  deviceId?: string | null;
+  deviceCount?: number;
+}
+
+export interface MtpVirtualFile { folderName: string; fileName: string }
+export interface MtpInstalledListing {
+  state: 'ready' | 'partial' | 'unavailable';
+  deviceId: string | null;
+  files: MtpVirtualFile[];
+  unidentifiedFiles: number;
+  message: string | null;
 }
 
 export const MTP_TRANSFER_STATES = ['preparing', 'copying', 'completed'] as const;
@@ -56,4 +67,5 @@ export interface MtpAdapter {
   copyFile(input: MtpCopyInput, signal?: AbortSignal): Promise<void>;
   /** Windows Shell folder picker (used for MTP install folder selection). */
   pickShellFolder(title: string): Promise<ShellFolderSelection | null>;
+  listInstalledTitles(signal?: AbortSignal): Promise<MtpInstalledListing>;
 }

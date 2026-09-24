@@ -43,7 +43,9 @@ export function InstallQueueTray() {
             }
             onRetry={() =>
               retryFailed.mutate(undefined, {
-                onSuccess: () => toast.success('Retrying failed files'),
+                onSuccess: (jobs) => jobs.length
+                  ? toast.success('Retrying failed files', `${jobs.length} file(s) queued.`)
+                  : toast.info('No files retried', 'Files may already be on the Switch or need a fresh install review.'),
                 onError: (error) => toast.error('Could not retry the failed files', messageOf(error)),
               })
             }

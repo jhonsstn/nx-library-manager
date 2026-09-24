@@ -177,7 +177,7 @@ describe('GameDetailsPane', () => {
     expect(screen.getByText('Base file · NSP · 4.0 GB · Zelda.nsp')).toBeInTheDocument();
     expect(screen.getByText('Newer update available')).toBeInTheDocument();
     expect(screen.getByText('On file: v65536 (1.0.0) · Latest released: v131072 (2.0.0) (2024-05-01)')).toBeInTheDocument();
-    expect(screen.getByText('Latest Installed: v65536 (1.0.0) | SD install')).toBeInTheDocument();
+    expect(screen.getByText('Last app transfer: v65536 (1.0.0) | SD install')).toBeInTheDocument();
     expect(screen.getByText('An open-air adventure.')).not.toBeVisible();
     expect(screen.getByText('Base file: D:\\games\\Zelda.nsp')).not.toBeVisible();
     await user.click(screen.getByText('About this game'));
@@ -214,7 +214,7 @@ describe('GameDetailsPane', () => {
 
     expect(await screen.findByText('Update file missing')).toBeVisible();
     expect(screen.getByText(/Missing v131072 .* TitleDB/)).toBeVisible();
-    expect(screen.getByText('3 listed · 2 files missing')).toBeVisible();
+    expect(screen.getByText('3 listed · 2 without a library file')).toBeVisible();
     expect(screen.getByText('Missing pack')).toBeVisible();
     expect(screen.getByText('Present pack')).toBeVisible();
     expect(screen.getByText('0100AABBCCDD1001 · Filename')).toBeVisible();
@@ -236,6 +236,33 @@ describe('GameDetailsPane', () => {
     expect(screen.getByText(/Downloading TitleDB update and DLC data/)).toBeVisible();
     expect(screen.queryByText('Update status unknown')).not.toBeInTheDocument();
     expect(screen.queryByText('TitleDB title-type index is unavailable.')).not.toBeInTheDocument();
+  });
+
+  it('separates Switch, library file, and TitleDB status for updates and DLC', async () => {
+    renderPane({
+      [IPC.mtp.getInventory]: () => ({ state: 'ready', deviceId: 'switch-1', revision: 2,
+        checkedAt: '2026-09-23T00:00:00Z', unidentifiedFiles: 0, message: null, titles: [] }),
+      [IPC.catalog.getGame]: () => details({
+        titleId: '0100AABBCCDD0000',
+        switchStatus: { base: 'not-installed', update: 'not-installed', updateVersion: null,
+          localContentReady: true },
+        knownDlc: [
+          { titleId: '0100AABBCCDD1001', name: 'Local pack', nameSource: 'filename',
+            filePresent: true, switchStatus: 'not-installed' },
+          { titleId: '0100AABBCCDD1002', name: 'Catalog pack', nameSource: 'titledb',
+            filePresent: false, switchStatus: 'not-installed' },
+        ],
+      }),
+    });
+    const section = await screen.findByRole('region', { name: 'On this Switch' });
+    expect(section).toHaveTextContent('Base game: Not installed');
+    expect(section).toHaveTextContent('Update: Not installed');
+    expect(section).toHaveTextContent('Library update: v65536');
+    expect(section).toHaveTextContent('Latest released: v131072');
+    expect(section).toHaveTextContent('Install missing local content');
+    expect(await screen.findByText('Catalog pack')).toBeVisible();
+    expect(screen.getByText('No library file')).toBeVisible();
+    expect(screen.getAllByText('Not installed')).toHaveLength(2);
   });
 
   it('groups the DLC and update files and installs the current selection', async () => {

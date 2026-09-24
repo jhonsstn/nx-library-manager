@@ -138,6 +138,8 @@ export function toMtpStatus(
   storages: MtpStorageDestination[],
   error: AppErrorDto | null,
   now: Date = new Date(),
+  deviceId: string | null = null,
+  deviceCount = 0,
 ): MtpStatus {
   return {
     available: storages.length > 0,
@@ -145,6 +147,8 @@ export function toMtpStatus(
     storages,
     checkedAt: now.toISOString(),
     error,
+    deviceId,
+    ...(deviceCount > 1 ? { deviceCount } : {}),
   };
 }
 

@@ -9,6 +9,7 @@ export const ListGamesInputSchema = z.object({
   favoritesOnly: z.boolean().optional(),
   needsReview: z.boolean().optional(),
   needsUpdate: z.boolean().optional(),
+  readyToInstall: z.boolean().optional(),
   hiddenOnly: z.boolean().optional(),
   sort: z.enum(['title-asc', 'title-desc', 'added-desc']).optional(),
   limit: positiveInt.max(10_000).optional(),
@@ -40,10 +41,20 @@ export const CreateInstallInputSchema = z
     updateIds: idList,
     includeBaseFile: z.boolean().optional(),
     destination: InstallDestinationSchema,
+    inventoryRevision: z.number().int().nonnegative().optional(),
+    allowAlreadyInstalled: z.boolean().optional(),
+    allowUnverified: z.boolean().optional(),
   })
   .refine((value) => Boolean(value.gameId) || value.updateIds.length > 0, {
     message: 'An install request needs a base game or at least one update file.',
   });
+
+export const PreviewInstallInputSchema = z.object({
+  gameId: positiveInt,
+  updateIds: idList,
+  includeBaseFile: z.boolean().optional(),
+  mode: z.enum(['suggested', 'selected']),
+});
 
 export const DeleteFileInputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('game'), gameId: positiveInt }),

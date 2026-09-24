@@ -131,6 +131,21 @@ export function contentsForGame(db: AppDatabase, gameId: number): ContainedTitle
     inspectionError: row.inspection_error, provisional: Boolean(row.provisional) }));
 }
 
+export function contentsForPath(db: AppDatabase, path: string): ContainedTitle[] {
+  const rows = db.prepare(`SELECT t.title_id, t.base_title_id, t.type, t.display_name, ft.raw_version,
+    ft.detection_source, lf.file_path, lf.inspection_error, t.provisional FROM file_titles ft
+    JOIN titles t ON t.id=ft.title_id JOIN local_files lf ON lf.id=ft.local_file_id
+    WHERE lf.file_path=?`).all(path) as Array<{
+      title_id: string | null; base_title_id: string | null; type: ContainedTitle['type'];
+      display_name: string; raw_version: number | null; detection_source: string;
+      file_path: string; inspection_error: string | null; provisional: number;
+    }>;
+  return rows.map((row) => ({ titleId: row.title_id, baseTitleId: row.base_title_id,
+    type: row.type, name: row.display_name, rawVersion: row.raw_version,
+    source: row.detection_source, filePath: row.file_path,
+    inspectionError: row.inspection_error, provisional: Boolean(row.provisional) }));
+}
+
 export function pruneMissingLocalFiles(db: AppDatabase, exists: (path: string) => boolean): void {
   const rows = db.prepare('SELECT id,file_path FROM local_files').all() as Array<{ id: number; file_path: string }>;
   const deleteRow = db.prepare('DELETE FROM local_files WHERE id=?');

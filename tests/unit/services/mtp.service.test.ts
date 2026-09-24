@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MtpService, toMtpStatusDto } from '@main/services/mtp.service';
-import type { MtpAdapter, MtpStatus, MtpStorageDestination, ShellFolderSelection } from '@main/mtp/mtp.adapter';
+import type { MtpAdapter, MtpInstalledListing, MtpStatus, MtpStorageDestination, ShellFolderSelection } from '@main/mtp/mtp.adapter';
 
 const GB = 1024 * 1024 * 1024;
 
@@ -20,22 +20,29 @@ interface FakeAdapter {
   adapter: MtpAdapter;
   statusCalls: number;
   pickCalls: string[];
+  listing: MtpInstalledListing;
+  status: MtpStatus;
 }
 
 function fakeAdapter(status: MtpStatus): FakeAdapter {
   const state: FakeAdapter = {
     statusCalls: 0,
     pickCalls: [],
+    status,
+    listing: { state: 'ready', deviceId: 'switch-1', files: [], unidentifiedFiles: 0, message: null },
     adapter: {
       async isAvailable() {
-        return status.available;
+        return state.status.available;
       },
       async listInstallDestinations() {
-        return status.storages;
+        return state.status.storages;
       },
       async getStatus() {
         state.statusCalls += 1;
-        return status;
+        return state.status;
+      },
+      async listInstalledTitles() {
+        return state.listing;
       },
       async copyFile() {
         /* not exercised here */
@@ -141,5 +148,61 @@ describe('MtpService', () => {
       label: 'Switch/SD Card Install',
     });
     expect(fake.pickCalls).toEqual(['Choose Switch install folder']);
+  });
+
+  it('scans on connection, keeps positive matches from a partial scan, and clears them on disconnect', async () => {
+    const fake = fakeAdapter({ ...okStatus([storage()]), deviceId: 'switch-1', deviceCount: 1 });
+    fake.listing = { state: 'partial', deviceId: 'switch-1', files: [
+      { folderName: 'Hades', fileName: 'Hades [0100AABBCCDD0000][v0].nsp' },
+    ], unidentifiedFiles: 1, message: 'One entry was not readable.' };
+    const service = new MtpService({ adapter: fake.adapter });
+    await service.getStatus({ refresh: true });
+    const partial = await service.refreshInventory();
+    expect(partial.state).toBe('partial');
+    expect(partial.titles).toEqual([{ titleId: '0100AABBCCDD0000', type: 'base', rawVersion: 0 }]);
+    expect(partial.unidentifiedFiles).toBe(1);
+
+    fake.status = { ...okStatus([]), deviceId: null, deviceCount: 0 };
+    await service.getStatus({ refresh: true });
+    expect(service.getInventory()).toMatchObject({ state: 'disconnected', deviceId: null, titles: [] });
+  });
+
+  it('rejects ambiguous multiple devices without accepting an inventory', async () => {
+    const fake = fakeAdapter({ ...okStatus([storage()]), deviceId: null, deviceCount: 2 });
+    const service = new MtpService({ adapter: fake.adapter });
+    await service.getStatus({ refresh: true });
+    expect(service.getInventory()).toMatchObject({ state: 'unavailable', titles: [], deviceId: null });
+    expect(service.getInventory().message).toMatch(/More than one/);
+  });
+
+  it('cancels an in-flight enumeration and discards its result on disconnect', async () => {
+    const fake = fakeAdapter({ ...okStatus([storage()]), deviceId: 'switch-1', deviceCount: 1 });
+    const finish: Array<(value: MtpInstalledListing) => void> = [];
+    let aborted = false;
+    fake.adapter.listInstalledTitles = (signal) => new Promise((resolve) => {
+      finish.push(resolve);
+      signal?.addEventListener('abort', () => { aborted = true; });
+    });
+    const service = new MtpService({ adapter: fake.adapter });
+    await service.getStatus({ refresh: true });
+    expect(service.getInventory().state).toBe('scanning');
+    fake.status = { ...okStatus([]), deviceId: null, deviceCount: 0 };
+    await service.getStatus({ refresh: true });
+    expect(aborted).toBe(true);
+    finish[0]?.({ state: 'ready', deviceId: 'switch-1', files: [
+      { folderName: 'Old', fileName: 'Old [0100AABBCCDD0000].nsp' },
+    ], unidentifiedFiles: 0, message: null });
+    await Promise.resolve();
+    expect(service.getInventory()).toMatchObject({ state: 'disconnected', titles: [] });
+  });
+
+  it('does not turn a failed status check into a claim that the Switch disconnected', async () => {
+    const fake = fakeAdapter({ ...okStatus([storage()]), deviceId: 'switch-1', deviceCount: 1 });
+    const service = new MtpService({ adapter: fake.adapter });
+    await service.refreshInventory();
+    fake.status = { ...okStatus([]), deviceId: null, deviceCount: 0,
+      error: { code: 'MTP_NOT_CONNECTED', message: 'Shell timed out', retryable: true } };
+    await service.getStatus({ refresh: true });
+    expect(service.getInventory()).toMatchObject({ state: 'error', titles: [], message: 'Shell timed out' });
   });
 });

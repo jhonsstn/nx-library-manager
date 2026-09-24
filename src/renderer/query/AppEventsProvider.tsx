@@ -62,6 +62,10 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
         api.mtp.onStatusChanged((status) => {
           queryClient.setQueryData(queryKeys.mtpStatus(), status);
         }),
+        api.mtp.onInventoryChanged((inventory) => {
+          queryClient.setQueryData(queryKeys.mtpInventory(), inventory);
+          void invalidateCatalog();
+        }),
         api.httpServer.onStatusChanged((status) => {
           queryClient.setQueryData(queryKeys.httpServerStatus(), status);
         }),

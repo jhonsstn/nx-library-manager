@@ -115,6 +115,30 @@ export interface KnownDlcDto {
   name: string;
   nameSource: 'titledb' | 'package' | 'filename' | 'title-id';
   filePresent: boolean;
+  switchStatus?: 'installed' | 'not-installed' | 'unknown';
+}
+
+export type MtpInventoryState = 'disconnected' | 'scanning' | 'ready' | 'partial' | 'unavailable' | 'error';
+export interface MtpInstalledTitleDto {
+  titleId: string;
+  type: GameFileKind;
+  rawVersion: number | null;
+}
+export interface MtpInventoryDto {
+  state: MtpInventoryState;
+  deviceId: string | null;
+  revision: number;
+  checkedAt: string | null;
+  titles: MtpInstalledTitleDto[];
+  unidentifiedFiles: number;
+  message: string | null;
+}
+export type SwitchPresence = 'installed' | 'not-installed' | 'unknown';
+export interface SwitchGameStatusDto {
+  base: SwitchPresence;
+  update: SwitchPresence;
+  updateVersion: number | null;
+  localContentReady: boolean;
 }
 
 export interface InstalledStatusDto {
@@ -144,6 +168,7 @@ export interface GameSummaryDto {
   hasNewerUpdate: boolean;
   hasCleanableUpdates: boolean;
   titleId?: string | null;
+  switchStatus?: SwitchGameStatusDto | null;
 }
 
 export interface GameDetailsDto extends GameSummaryDto {
@@ -162,6 +187,7 @@ export interface GameDetailsDto extends GameSummaryDto {
   containedTitles?: ContainedTitleDto[];
   knownDlc?: KnownDlcDto[];
   knownDlcRefreshedAt?: string | null;
+  localDlc?: KnownDlcDto[];
 }
 
 export interface ScanProgressDto {
@@ -242,6 +268,23 @@ export interface InstallJobDto {
   completedAt: string | null;
 }
 
+export interface InstallPreviewItemDto {
+  filePath: string;
+  fileName: string;
+  fileSize: number;
+  assessment: 'needed' | 'already-installed' | 'unknown' | 'older-update';
+  reason: string;
+  selectedByDefault: boolean;
+  includesAlreadyInstalled: boolean;
+  includeBaseFile: boolean;
+  updateIds: number[];
+}
+export interface InstallPreviewDto {
+  inventoryRevision: number;
+  inventoryState: MtpInventoryState;
+  items: InstallPreviewItemDto[];
+}
+
 export interface MtpStorageInfoDto {
   id: 'sd' | 'nand' | 'other';
   label: string;
@@ -258,6 +301,7 @@ export interface MtpStatusDto {
   statusText: string;
   checkedAt: string;
   error: AppErrorDto | null;
+  deviceId?: string | null;
 }
 
 export interface HttpServerStatusDto {

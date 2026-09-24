@@ -152,6 +152,7 @@ describe('toMtpStatus', () => {
       storages: [sd],
       checkedAt: '2026-09-22T10:00:00.000Z',
       error: null,
+      deviceId: null,
     });
   });
 

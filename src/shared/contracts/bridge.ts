@@ -9,10 +9,12 @@ import type {
   GameSummaryDto,
   HttpServerStatusDto,
   InstallJobDto,
+  InstallPreviewDto,
   JobStartedDto,
   MetadataBulkProgressDto,
   MetadataCandidateDto,
   MtpStatusDto,
+  MtpInventoryDto,
   PagedResult,
   ScanCompletedDto,
   ScanProgressDto,
@@ -112,6 +114,7 @@ export function createSwitchCatalogApi(bridge: IpcBridge): SwitchCatalogApi {
       moveFile: (input) => call<FileOperationResultDto>(IPC.files.moveFile, [input]),
     },
     install: {
+      preview: (input) => call<InstallPreviewDto>(IPC.install.preview, [input]),
       create: (input) => call<InstallJobDto[]>(IPC.install.create, [input]),
       cancel: (jobId) => call<void>(IPC.install.cancel, [jobId]),
       retryFailed: () => call<InstallJobDto[]>(IPC.install.retryFailed),
@@ -121,7 +124,10 @@ export function createSwitchCatalogApi(bridge: IpcBridge): SwitchCatalogApi {
     mtp: {
       getStatus: () => call<MtpStatusDto>(IPC.mtp.getStatus),
       refresh: () => call<MtpStatusDto>(IPC.mtp.refresh),
+      getInventory: () => call<MtpInventoryDto>(IPC.mtp.getInventory),
+      refreshInventory: () => call<MtpInventoryDto>(IPC.mtp.refreshInventory),
       onStatusChanged: async (listener) => on<MtpStatusDto>(EVENTS.mtpStatusChanged, listener),
+      onInventoryChanged: async (listener) => on<MtpInventoryDto>(EVENTS.mtpInventoryChanged, listener),
     },
     httpServer: {
       getStatus: () => call<HttpServerStatusDto>(IPC.httpServer.getStatus),

@@ -2,13 +2,13 @@ import { existsSync, statfsSync, statSync } from 'node:fs';
 import { dirname, isAbsolute } from 'node:path';
 
 import { MTP_TRANSFER_TIMEOUT_SECONDS } from '../../shared/constants';
-import type { CreateInstallInput, InstallDestination } from '../../shared/contracts/api';
+import type { CreateInstallInput, InstallDestination, PreviewInstallInput } from '../../shared/contracts/api';
 import { SwitchCatalogError, appError, toAppErrorDto } from '../../shared/errors/app-error';
 import type { AppErrorDto } from '../../shared/errors/codes';
 import { formatBytes } from '../../shared/format/bytes';
 import { isShellPath } from '../../shared/format/install';
 import { CreateInstallInputSchema } from '../../shared/schemas/inputs';
-import type { GameFileKind, InstallDestinationType, InstallJobDto } from '../../shared/types/domain';
+import type { GameFileKind, InstallDestinationType, InstallJobDto, InstallPreviewDto, MtpInventoryDto } from '../../shared/types/domain';
 import type { AppSettings } from '../../shared/types/settings';
 import type { AppDatabase } from '../db/database';
 import { withTransaction } from '../db/database';
@@ -16,6 +16,7 @@ import type { Logger } from '../lifecycle/logger';
 import type { MtpAdapter, MtpStorageDestination, MtpTransferState } from '../mtp/mtp.adapter';
 import { getBaseFile } from '../repositories/game-files.repository';
 import {
+  clearFinishedInstallJobs,
   getInstallJob,
   insertInstallJob,
   listInstallJobs,
@@ -24,8 +25,9 @@ import {
   updateInstallJob,
   type InstallJobUpdate,
 } from '../repositories/install-jobs.repository';
-import { getUpdate, type UpdateRecord } from '../repositories/updates.repository';
-import { movePhysicalFileRows } from '../repositories/title-catalog.repository';
+import { getUpdate, listUpdatesForGame, type UpdateRecord } from '../repositories/updates.repository';
+import { contentsForGame, contentsForPath, movePhysicalFileRows } from '../repositories/title-catalog.repository';
+import { assessInstallFile } from '../mtp/install-assessment';
 import { isDlcGroupFilename } from '../scanner/filename-parser';
 import { moveFileToFolder } from './file.service';
 
@@ -47,6 +49,8 @@ export interface InstallServiceOptions {
   now?: () => number;
   /** Test seam for destination free space; `null` means "could not be verified". */
   freeSpace?: (folder: string) => Promise<number | null>;
+  inventory?: () => MtpInventoryDto;
+  onMtpBatchFinished?: () => void;
 }
 
 /** One file scheduled for transfer, before it becomes an `install_jobs` row. */
@@ -76,6 +80,8 @@ export class InstallService {
   private readonly onJobChanged: ((job: InstallJobDto) => void) | undefined;
   private readonly now: () => number;
   private readonly freeSpace: ((folder: string) => Promise<number | null>) | undefined;
+  private readonly inventory: (() => MtpInventoryDto) | undefined;
+  private readonly onMtpBatchFinished: (() => void) | undefined;
 
   private activePump: Promise<void> | null = null;
   private activeLocalTransfer: { jobId: number; controller: AbortController } | null = null;
@@ -93,6 +99,31 @@ export class InstallService {
     this.onJobChanged = options.onJobChanged;
     this.now = options.now ?? Date.now;
     this.freeSpace = options.freeSpace;
+    this.inventory = options.inventory;
+    this.onMtpBatchFinished = options.onMtpBatchFinished;
+  }
+
+  preview(input: PreviewInstallInput): InstallPreviewDto {
+    const inventory = this.inventory?.() ?? { state: 'disconnected' as const, deviceId: null,
+      revision: 0, checkedAt: null, titles: [], unidentifiedFiles: 0, message: null };
+    const allUpdates = listUpdatesForGame(this.db, input.gameId);
+    const updateIds = input.mode === 'suggested' ? allUpdates.map((row) => row.id) : (input.updateIds ?? []);
+    const items = this.buildItems({ gameId: input.gameId, updateIds,
+      includeBaseFile: input.includeBaseFile !== false });
+    const basePath = getBaseFile(this.db, input.gameId)?.filePath;
+    const contents = contentsForGame(this.db, input.gameId);
+    const latestLocalPatch = Math.max(0, ...contents.filter((item) => item.type === 'update'
+      && !item.provisional && item.source === 'cnmt' && item.rawVersion !== null)
+      .map((item) => item.rawVersion as number));
+    return {
+      inventoryRevision: inventory.revision, inventoryState: inventory.state,
+      items: items.map((item) => ({
+        filePath: item.sourcePath, fileName: item.fileName, fileSize: item.fileSize,
+        ...assessInstallFile(contentsForPath(this.db, item.sourcePath), inventory, latestLocalPatch),
+        includeBaseFile: item.sourcePath === basePath,
+        updateIds: allUpdates.filter((row) => row.filePath === item.sourcePath).map((row) => row.id),
+      })),
+    };
   }
 
   /**
@@ -174,6 +205,22 @@ export class InstallService {
       includeBaseFile: parsed.data.includeBaseFile !== false,
     });
 
+    if (destination.type !== 'folder' && this.inventory) {
+      const inventory = this.inventory();
+      if (parsed.data.inventoryRevision !== inventory.revision)
+        throw appError('VALIDATION_ERROR', 'Switch inventory changed. Review the install plan again.');
+      if (inventory.checkedAt && Date.now() - Date.parse(inventory.checkedAt) > 5 * 60_000)
+        throw appError('VALIDATION_ERROR', 'Switch inventory is old. Refresh and review the install plan again.');
+      const preview = gameId === null ? null : this.preview({ gameId,
+        updateIds: parsed.data.updateIds, includeBaseFile: parsed.data.includeBaseFile, mode: 'selected' });
+      const assessments = preview?.items ?? items.map(() => ({ assessment: 'unknown' as const }));
+      if (assessments.some((item) => item.assessment === 'already-installed' || item.assessment === 'older-update')
+        && !parsed.data.allowAlreadyInstalled)
+        throw appError('VALIDATION_ERROR', 'An already installed or older file was selected. Review or explicitly allow it.');
+      if (assessments.some((item) => item.assessment === 'unknown') && !parsed.data.allowUnverified)
+        throw appError('VALIDATION_ERROR', 'Some files could not be checked against the Switch. Confirm an unverified install.');
+    }
+
     this.assertSourcesExist(items);
     await this.assertFreeSpace(destination, items.reduce((total, item) => total + item.fileSize, 0));
 
@@ -209,6 +256,12 @@ export class InstallService {
     return listInstallJobs(this.db);
   }
 
+  clearHistory(): number {
+    const deleted = clearFinishedInstallJobs(this.db);
+    this.logger?.info('install.historyCleared', { deleted });
+    return deleted;
+  }
+
   /**
    * Re-queues failed jobs whose source file still exists. The original rows are
    * kept as history; each retry is a fresh job (spec 08: retry the failed
@@ -219,8 +272,20 @@ export class InstallService {
     const retryable: InstallJobDto[] = [];
     let skipped = 0;
     for (const job of listJobsByStatus(this.db, ['failed'])) {
-      if (this.sourceExists(job.sourcePath)) retryable.push(job);
-      else skipped += 1;
+      if (!this.sourceExists(job.sourcePath)) { skipped += 1; continue; }
+      if (job.destinationType !== 'folder' && this.inventory) {
+        const inventory = this.inventory();
+        const contents = contentsForPath(this.db, job.sourcePath);
+        const gameContents = job.gameId === null ? contents : contentsForGame(this.db, job.gameId);
+        const latestLocalPatch = Math.max(0, ...gameContents.filter((item) => item.type === 'update'
+          && !item.provisional && item.source === 'cnmt' && item.rawVersion !== null)
+          .map((item) => item.rawVersion as number));
+        if (assessInstallFile(contents, inventory, latestLocalPatch).assessment !== 'needed') {
+          skipped += 1;
+          continue;
+        }
+      }
+      retryable.push(job);
     }
     if (retryable.length === 0) {
       this.logger?.info('install.retryNothingToDo', { skipped });
@@ -465,6 +530,7 @@ export class InstallService {
 
   /** Drains pending jobs in id order, one transfer at a time. Never rejects. */
   private async runPump(): Promise<void> {
+    let touchedMtp = false;
     try {
       for (;;) {
         if (this.stopQueue || this.shuttingDown) break;
@@ -478,6 +544,7 @@ export class InstallService {
           continue;
         }
         try {
+          if (job.destinationType !== 'folder') touchedMtp = true;
           await this.executeJob(job);
         } catch (error) {
           const dto = toAppErrorDto(error);
@@ -491,6 +558,7 @@ export class InstallService {
       this.logger?.error('install.queueFailed', { error: describeError(error) });
     } finally {
       if (!this.shuttingDown) this.stopQueue = false;
+      if (touchedMtp) this.onMtpBatchFinished?.();
     }
   }
 

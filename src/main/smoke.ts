@@ -6,10 +6,19 @@ import { runMigrations } from './db/migrations';
 import { inspectInWorker } from './scanner/inspect-worker';
 import { INSPECTOR_VERSION } from './scanner/package-inspector';
 import { contentsForGame, recordInspection } from './repositories/title-catalog.repository';
+import { readScript } from './mtp/powershell-runner';
+import { parseInstalledListing } from './mtp/installed-parser';
 
 /** Headless check used after Windows packaging. Exercises native SQLite, the
  * migration, and the packaged inspection worker without opening a window. */
 export async function runPackagedSmoke(): Promise<void> {
+  const inventoryScript = readScript('mtp-list-installed.ps1');
+  if (!inventoryScript.includes('Installed games')) throw new Error('Packaged DBI inventory script is missing');
+  const inventory = parseInstalledListing({ state: 'ready', deviceId: 'smoke-device',
+    files: [{ folderName: 'Smoke', fileName: 'Smoke [0100AABBCCDD0000][v0].nsp' }],
+    unidentifiedFiles: 0, message: null });
+  if (!inventory.complete || inventory.titles[0]?.titleId !== '0100AABBCCDD0000')
+    throw new Error('Packaged DBI inventory parser failed');
   const dir = mkdtempSync(join(tmpdir(),'switch-catalog-smoke-'));
   const databaseFile = join(dir,'catalog.sqlite3');
   const packageFile = join(dir,'smoke.nsp');

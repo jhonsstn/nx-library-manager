@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { CreateInstallInput, InstallDestination, InstallableUpdateDto } from '@shared/contracts/api';
 import { formatBytes } from '@shared/format/bytes';
 import { installSizeText } from '@shared/format/install';
 import { detectedVersionSuffix, rawVersionFromVersionText } from '@shared/format/versions';
-import type { GameDetailsDto, InstallDestinationType, MtpStatusDto } from '@shared/types/domain';
+import type { ContainedTitleDto, GameDetailsDto, InstallDestinationType, InstallJobDto, MtpInventoryDto, MtpStatusDto } from '@shared/types/domain';
 import { Button } from '@renderer/components/Button';
 import { ErrorText, Skeleton } from '@renderer/components/Feedback';
 import { Modal } from '@renderer/components/Modal';
-import { useToast } from '@renderer/components/Toast';
-import { useGame, useInstallMutations, useMtpStatus, useSettings, useUpdates } from '@renderer/query/hooks';
+import { useGame, useInstallMutations, useMtpInventory, useMtpStatus, useRefreshMtpInventory,
+  useSettings, useUpdates } from '@renderer/query/hooks';
+import { getCatalogApi } from '@renderer/api';
+import { InstallBatchProgress } from './InstallBatchProgress';
 
 /** Destination choices shared by the install dialog and the inline install controls. */
 export const INSTALL_DESTINATION_OPTIONS: Array<{ value: InstallDestinationType; label: string }> = [
@@ -34,6 +37,7 @@ export interface InstallDialogProps {
   updateIds?: number[];
   /** Fixed destination; when absent the dialog offers the settings default as a choice. */
   destination?: InstallDestination;
+  suggested?: boolean;
   onClose: () => void;
 }
 
@@ -105,25 +109,41 @@ function freeSpaceWarning(destination: InstallDestination | null, mtp: MtpStatus
   return null;
 }
 
-export function InstallDialog({ gameId, updateIds = [], destination, onClose }: InstallDialogProps) {
-  const toast = useToast();
+export function InstallDialog({ gameId, updateIds = [], destination, suggested = false, onClose }: InstallDialogProps) {
   const settings = useSettings();
   const mtp = useMtpStatus();
   const game = useGame(gameId ?? null);
   const updates = useUpdates({});
   const { create } = useInstallMutations();
+  const [queuedBatch, setQueuedBatch] = useState<{
+    jobs: InstallJobDto[]; contents: ContainedTitleDto[]; before: MtpInventoryDto | null;
+  } | null>(null);
   const [kind, setKind] = useState<InstallDestinationType | null>(destination ? destinationKindOf(destination) : null);
 
   useEffect(() => {
     if (destination || kind !== null) return;
     const preferred = settings.data?.defaultInstallDestination;
-    if (preferred) setKind(preferred);
-  }, [destination, kind, settings.data]);
+    if (preferred) setKind(suggested ? (preferred === 'mtp-nand' ? 'mtp-nand' : 'mtp-sd') : preferred);
+  }, [destination, kind, settings.data, suggested]);
 
   const effectiveDestination = useMemo(
     () => destination ?? (kind ? buildDestination(kind, settings.data?.defaultInstallFolder ?? '') : null),
     [destination, kind, settings.data],
   );
+  const mtpMode = effectiveDestination?.type === 'mtp';
+  const inventory = useMtpInventory(mtpMode);
+  const refreshInventory = useRefreshMtpInventory();
+  const preview = useQuery({
+    queryKey: ['install-preview', gameId, suggested, updateIds, inventory.data?.revision],
+    queryFn: () => getCatalogApi().install.preview({ gameId: gameId as number, updateIds,
+      includeBaseFile: true, mode: suggested ? 'suggested' : 'selected' }),
+    enabled: mtpMode && gameId != null,
+  });
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [allowUnmatched, setAllowUnmatched] = useState(false);
+  useEffect(() => {
+    setSelectedPaths(preview.data?.items.filter((item) => item.selectedByDefault).map((item) => item.filePath) ?? []);
+  }, [preview.data]);
 
   const plan = useMemo(
     () => planFiles(game.data?.baseFile ?? null, updates.data ?? [], updateIds),
@@ -131,9 +151,14 @@ export function InstallDialog({ gameId, updateIds = [], destination, onClose }: 
   );
   const baseFile = game.data?.baseFile ?? null;
   const updatePlan = plan.filter((file) => file.group !== 'Base game');
-  const loading = updates.isLoading || (gameId != null && game.isLoading);
+  const loading = updates.isLoading || (gameId != null && game.isLoading) || (mtpMode && gameId != null && preview.isLoading);
   const warning = freeSpaceWarning(effectiveDestination, mtp.data);
-  const canConfirm = !loading && plan.length > 0 && effectiveDestination !== null && !create.isPending;
+  const selectedPreview = preview.data?.items.filter((item) => selectedPaths.includes(item.filePath)) ?? [];
+  const canConfirm = !loading && effectiveDestination !== null && !create.isPending && (
+    mtpMode ? (gameId != null ? selectedPreview.length > 0 && preview.data !== undefined
+      && !preview.isFetching && !preview.isError
+      : plan.length > 0 && allowUnmatched && inventory.data !== undefined)
+      : plan.length > 0);
 
   const confirm = () => {
     if (!effectiveDestination) return;
@@ -142,13 +167,28 @@ export function InstallDialog({ gameId, updateIds = [], destination, onClose }: 
       payload.gameId = gameId;
       payload.includeBaseFile = baseFile !== null;
     }
+    if (mtpMode) {
+      payload.inventoryRevision = preview.data?.inventoryRevision ?? inventory.data?.revision;
+      if (gameId != null) {
+        payload.includeBaseFile = selectedPreview.some((item) => item.includeBaseFile);
+        payload.updateIds = [...new Set(selectedPreview.flatMap((item) => item.updateIds))];
+        payload.allowAlreadyInstalled = selectedPreview.some((item) =>
+          item.assessment === 'already-installed' || item.assessment === 'older-update');
+        payload.allowUnverified = selectedPreview.some((item) => item.assessment === 'unknown');
+      } else payload.allowUnverified = allowUnmatched;
+    }
     create.mutate(payload, {
-      onSuccess: () => {
-        toast.success('Install queued', `${plan.length} file(s) queued for transfer.`);
-        onClose();
+      onSuccess: (jobs) => {
+        if (jobs.length === 0) { onClose(); return; }
+        setQueuedBatch({ jobs, contents: game.data?.containedTitles ?? [], before: inventory.data ?? null });
       },
     });
   };
+
+  if (queuedBatch) return <Modal title="Install progress" onClose={onClose}>
+    <InstallBatchProgress jobs={queuedBatch.jobs} contents={queuedBatch.contents}
+      deviceId={queuedBatch.before?.deviceId ?? null} before={queuedBatch.before} onClose={onClose} />
+  </Modal>;
 
   return (
     <Modal
@@ -174,7 +214,33 @@ export function InstallDialog({ gameId, updateIds = [], destination, onClose }: 
           <p className="panel__hint">
             Files are transferred in this order — the base game first, then updates oldest to newest, then DLC.
           </p>
-          {plan.length === 0 ? (
+          {mtpMode && gameId != null ? (
+            <div className="stack" aria-label="Switch install review">
+              <div className="row">
+                <strong>Switch install review</strong>
+                <Button onClick={() => refreshInventory.mutate()} disabled={refreshInventory.isPending}>
+                  Refresh Switch
+                </Button>
+              </div>
+              <p className="dim">{preview.data?.inventoryState === 'ready'
+                ? 'Checked against the connected Switch. Select skipped files only if you want to install them again.'
+                : 'Switch inventory is incomplete or unavailable. Unverified files require manual selection.'}</p>
+              {preview.data?.items.map((item) => (
+                <label className="install-preview__item" key={item.filePath}>
+                  <input type="checkbox" checked={selectedPaths.includes(item.filePath)}
+                    onChange={(event) => setSelectedPaths((paths) => event.target.checked
+                      ? [...paths, item.filePath] : paths.filter((path) => path !== item.filePath))} />
+                  <span><strong>{item.fileName}</strong><small>{item.reason}{item.includesAlreadyInstalled
+                    ? ' This package also contains already installed content.' : ''}</small></span>
+                  <span className="dim">{formatBytes(item.fileSize)}</span>
+                </label>
+              ))}
+              {preview.data?.items.length === 0 ? <p className="dim">No local files are available for this game.</p> : null}
+              <p className="install-plan__total">Selected: {selectedPreview.length} file(s) · {' '}
+                {formatBytes(selectedPreview.reduce((bytes, item) => bytes + item.fileSize, 0))}</p>
+              <ErrorText error={preview.error} />
+            </div>
+          ) : plan.length === 0 ? (
             <p className="dim">Nothing to install yet: select a base file or one or more update/DLC files.</p>
           ) : (
             <ul className="list install-plan" aria-label="Files to transfer">
@@ -192,13 +258,19 @@ export function InstallDialog({ gameId, updateIds = [], destination, onClose }: 
             </ul>
           )}
 
-          <p className="install-plan__total">
+          {mtpMode && gameId == null ? <label className="checkbox install-warning">
+            <input type="checkbox" checked={allowUnmatched}
+              onChange={(event) => setAllowUnmatched(event.target.checked)} />
+            This unmatched file cannot be checked against installed content. Install anyway.
+          </label> : null}
+
+          {!mtpMode ? <p className="install-plan__total">
             {installSizeText({
               baseSize: Number(baseFile?.fileSize ?? 0),
               selectedUpdateCount: updatePlan.length,
               selectedUpdateSize: updatePlan.reduce((sum, file) => sum + Number(file.size || 0), 0),
             })}
-          </p>
+          </p> : null}
 
           {destination ? (
             <p className="dim">Destination: {describeDestination(effectiveDestination, settings.data?.installFolderLabel)}</p>

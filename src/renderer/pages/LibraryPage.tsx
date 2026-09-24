@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GameSummaryDto } from '@shared/types/domain';
 import { useContextMenu, type ContextMenuItem } from '@renderer/components/ContextMenu';
@@ -7,7 +7,8 @@ import { useToast } from '@renderer/components/Toast';
 import { useSelection } from '@renderer/app/SelectionProvider';
 import { useDebouncedValue } from '@renderer/hooks/useDebouncedValue';
 import { useAppEvents } from '@renderer/query/AppEventsProvider';
-import { useExportBackup, useFileMutations, useGames, useGenres, useMarkAsUpdate, useScan, useSetFavorite, useSetHidden } from '@renderer/query/hooks';
+import { useExportBackup, useFileMutations, useGames, useGenres, useMarkAsUpdate, useScan,
+  useSetFavorite, useSetHidden, useMtpInventory, useRefreshMtpInventory } from '@renderer/query/hooks';
 import { GameDetailsPane } from '@renderer/features/details/GameDetailsPane';
 import { BulkMetadataDialog } from '@renderer/features/metadata/BulkMetadataDialog';
 import { MetadataRematchDialog } from '@renderer/features/metadata/MetadataRematchDialog';
@@ -41,6 +42,7 @@ export function LibraryPage() {
   const [genre, setGenre] = useState<string>(ALL_GENRES);
   const [needsReview, setNeedsReview] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);
+  const [readyToInstall, setReadyToInstall] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [bulkMetadataOpen, setBulkMetadataOpen] = useState(false);
   const [rematchGameId, setRematchGameId] = useState<number | null>(null);
@@ -55,9 +57,15 @@ export function LibraryPage() {
     genre: genre === ALL_GENRES ? undefined : genre,
     needsReview,
     needsUpdate,
+    readyToInstall,
     hiddenOnly: showHidden,
   });
   const genres = useGenres();
+  const inventory = useMtpInventory();
+  const refreshInventory = useRefreshMtpInventory();
+  useEffect(() => {
+    if (inventory.data?.state !== 'ready') setReadyToInstall(false);
+  }, [inventory.data?.state]);
 
   const scanRunning = scanProgress !== null || scan.start.isPending;
 
@@ -124,6 +132,10 @@ export function LibraryPage() {
             onNeedsReviewChange={setNeedsReview}
             needsUpdate={needsUpdate}
             onNeedsUpdateChange={setNeedsUpdate}
+            readyToInstall={readyToInstall}
+            onReadyToInstallChange={setReadyToInstall}
+            inventory={inventory.data ?? null}
+            onRefreshInventory={() => refreshInventory.mutate()}
             showHidden={showHidden}
             onShowHiddenChange={(value) => { setShowHidden(value); selectGame(null); }}
             scanProgress={scanProgress}
@@ -141,6 +153,7 @@ export function LibraryPage() {
             onSelect={selectGame}
             onContextMenu={openGameMenu}
             emptyMessage={showHidden ? 'No hidden games match the current filters.' : 'No games match the current filters.'}
+            inventoryReady={inventory.data?.state === 'ready'}
           />
         </section>
         <section className="split__pane split__pane--right" aria-label="Game details">

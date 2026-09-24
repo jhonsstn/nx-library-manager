@@ -84,6 +84,23 @@
   color: var(--accent);
 }
 
+.library-row__switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.library-row__switch--installed { color: var(--success); }
+.library-row__switch--not-installed,
+.library-row__switch--needs-content { color: var(--warning); }
+.library-row__switch--unknown { color: var(--text-dim); }
+
 .library-skeletons {
   padding: var(--space-3);
   display: flex;
@@ -225,6 +242,31 @@
 
 .details__update-card--success strong {
   color: var(--success);
+}
+
+.details__switch {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--bg-panel);
+}
+
+.details__switch h3 {
+  margin: 0;
+  flex: 1;
+}
+
+.details__switch p {
+  margin: var(--space-2) 0;
+}
+
+.details__switch .details__dlc-row {
+  flex-wrap: wrap;
+}
+
+.details__switch .details__dlc-name {
+  flex: 1 1 12rem;
 }
 
 .details__actions {

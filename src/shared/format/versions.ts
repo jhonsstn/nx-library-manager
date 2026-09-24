@@ -85,7 +85,7 @@ export function formatVersionStatusText(status: Pick<VersionStatusDto, 'localVer
 
 /** Single-line installed-version text identical to `ui.installed_status_text`'s output. */
 export function formatInstalledStatus(installed: InstalledStatusDto | null): string {
-  if (!installed) return 'Latest Installed: None';
+  if (!installed) return 'Last app transfer: None';
   const where = installed.destinationLabel || installed.destinationFolder || 'unknown destination';
-  return `Latest Installed: ${versionLabel(installed.rawVersion)} | ${where}`;
+  return `Last app transfer: ${versionLabel(installed.rawVersion)} | ${where}`;
 }

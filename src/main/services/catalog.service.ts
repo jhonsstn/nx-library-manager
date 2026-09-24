@@ -7,6 +7,7 @@ import type {
   GameFileDto,
   GameSummaryDto,
   KnownDlcDto,
+  MtpInventoryDto,
   PagedResult,
   ScreenshotDto,
   UpdateFileDto,
@@ -48,12 +49,14 @@ import { listScreenshots } from '../repositories/screenshots.repository';
 import type { VersionService } from './version.service';
 import { contentsForGame, type ContainedTitle } from '../repositories/title-catalog.repository';
 import { previewOldUpdates } from '../repositories/update-cleanup.repository';
+import { consoleGameStatus, consolePresence } from '../mtp/console-status';
 
 export interface CatalogServiceOptions {
   db: AppDatabase;
   versions: VersionService;
   settings: () => AppSettings;
   logger?: Logger;
+  inventory?: () => MtpInventoryDto;
 }
 
 /**
@@ -65,12 +68,15 @@ export class CatalogService {
   private readonly versions: VersionService;
   private readonly settings: () => AppSettings;
   private readonly logger: Logger | undefined;
+  private readonly inventory: () => MtpInventoryDto;
 
   constructor(options: CatalogServiceOptions) {
     this.db = options.db;
     this.versions = options.versions;
     this.settings = options.settings;
     this.logger = options.logger;
+    this.inventory = options.inventory ?? (() => ({ state: 'disconnected', deviceId: null,
+      revision: 0, checkedAt: null, titles: [], unidentifiedFiles: 0, message: null }));
   }
 
   /**
@@ -93,6 +99,7 @@ export class CatalogService {
       this.toSummary(row, baseFiles.get(row.id) ?? null, updateGroups.get(row.id) ?? []),
     );
     if (input.needsUpdate) summaries = summaries.filter((summary) => summary.hasNewerUpdate);
+    if (input.readyToInstall) summaries = summaries.filter((summary) => summary.switchStatus?.localContentReady);
     const total = summaries.length;
     const offset = input.offset ?? 0;
     const items = input.limit === undefined ? summaries.slice(offset) : summaries.slice(offset, offset + input.limit);
@@ -129,6 +136,7 @@ export class CatalogService {
         title_id: string; display_name: string; name_source: string; file_name: string;
       }>;
     const localDlcIds = new Set(localDlcRows.map((row) => row.title_id));
+    const inventory = this.inventory();
     const baseName = contents.find((item) => item.type === 'base' && !item.provisional)?.name ?? record.displayTitle;
     const knownDlc: KnownDlcDto[] = titleId ? this.versions.dlcIndex.forBase(titleId).map((entry) => {
       const catalogName = entry.name && entry.name.toUpperCase() !== entry.titleId ? entry.name : null;
@@ -143,8 +151,25 @@ export class CatalogService {
       const name = catalogName ?? packageName ?? filenameName ?? entry.titleId;
       const nameSource: KnownDlcDto['nameSource'] = catalogName ? 'titledb'
         : packageName ? 'package' : filenameName ? 'filename' : 'title-id';
-      return { titleId: entry.titleId, name, nameSource, filePresent: localDlcIds.has(entry.titleId) };
+      return { titleId: entry.titleId, name, nameSource, filePresent: localDlcIds.has(entry.titleId),
+        switchStatus: consolePresence(inventory, entry.titleId) };
     }) : [];
+    const knownIds = new Set(knownDlc.map((entry) => entry.titleId));
+    const localDlc: KnownDlcDto[] = [...new Set(localDlcRows.map((row) => row.title_id))]
+      .filter((id) => !knownIds.has(id)).map((id) => {
+        const local = localDlcRows.filter((row) => row.title_id === id);
+        const packageName = local.find((row) => row.name_source === 'nacp'
+          && !sameTitleName(row.display_name, baseName))?.display_name;
+        const filenameName = local.map((row) => {
+          const embeddedId = extractTitleId(row.file_name);
+          return embeddedId && embeddedId !== id ? null : dlcNameFromFilename(row.file_name);
+        }).find((name) => name !== null);
+        const storedName = local.find((row) => row.display_name
+          && !sameTitleName(row.display_name, baseName))?.display_name;
+        return { titleId: id, name: packageName ?? filenameName ?? storedName ?? id,
+          nameSource: packageName ? 'package' : (filenameName || storedName) ? 'filename' : 'title-id',
+          filePresent: true, switchStatus: consolePresence(inventory, id) };
+      });
     return {
       ...summary,
       description: record.description,
@@ -160,6 +185,7 @@ export class CatalogService {
       updateCleanup,
       containedTitles: contents,
       knownDlc,
+      localDlc,
       knownDlcRefreshedAt: this.versions.dlcIndex.refreshedAt,
       installed: this.versions.installedStatus({
         gameId,
@@ -284,6 +310,7 @@ export class CatalogService {
       hasNewerUpdate: Boolean(status.missingUpdate),
       hasCleanableUpdates,
       titleId: titleId || null,
+      switchStatus: consoleGameStatus(this.inventory(), titleId, contents),
     };
   }
 

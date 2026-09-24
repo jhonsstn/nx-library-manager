@@ -8,6 +8,7 @@ export const queryKeys = {
   updates: (filters: ListUpdatesInput) => ['updates', filters] as const,
   settings: () => ['settings'] as const,
   mtpStatus: () => ['mtp-status'] as const,
+  mtpInventory: () => ['mtp-inventory'] as const,
   httpServerStatus: () => ['http-server-status'] as const,
   installJobs: () => ['install-jobs'] as const,
   appVersion: () => ['app-version'] as const,

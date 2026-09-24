@@ -75,6 +75,7 @@ foreach ($device in $root.Items()) {
     if (-not $deviceLooksLikeSwitch) {
         continue
     }
+    $rows += [PSCustomObject]@{ name = ''; device_id = $devicePath }
     $deviceFolder = $null
     try { $deviceFolder = $device.GetFolder } catch {}
     if ($null -eq $deviceFolder) {
@@ -101,6 +102,7 @@ foreach ($device in $root.Items()) {
                 free_bytes = $freeBytes
                 total_bytes = $totalBytes
                 path = "$($storage.Path)"
+                device_id = $devicePath
             }
         }
     }

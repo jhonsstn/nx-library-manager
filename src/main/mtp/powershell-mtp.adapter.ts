@@ -6,6 +6,7 @@ import type { AppErrorDto } from '../../shared/errors/codes';
 import type {
   MtpAdapter,
   MtpCopyInput,
+  MtpInstalledListing,
   MtpStatus,
   MtpStorageDestination,
   ShellFolderSelection,
@@ -27,6 +28,7 @@ import {
 const STATUS_SCRIPT = 'mtp-list-storage.ps1';
 const COPY_SCRIPT = 'mtp-copy-file.ps1';
 const PICKER_SCRIPT = 'mtp-pick-folder.ps1';
+const INSTALLED_SCRIPT = 'mtp-list-installed.ps1';
 
 export interface PowerShellMtpAdapterOptions {
   /** Directory holding the `.ps1` programs; defaults to the resolved scripts dir. */
@@ -91,18 +93,44 @@ export class PowerShellMtpAdapter implements MtpAdapter {
       if (result.code !== 0) {
         return toMtpStatus([], statusError(scriptMessage(result)), new Date());
       }
-      const storages = parseStoragePayload(result.stdout);
-      if (storages === null) {
+      const payload = parseStoragePayload(result.stdout);
+      if (payload === null) {
         return toMtpStatus(
           [],
           statusError('Could not read Switch MTP storage: unexpected PowerShell output.'),
           new Date(),
         );
       }
-      return toMtpStatus(storages, null, new Date());
+      return toMtpStatus(payload.storages, null, new Date(), payload.deviceId, payload.deviceCount);
     } catch (error) {
       return toMtpStatus([], statusError(statusFailureMessage(error, seconds)), new Date());
     }
+  }
+
+  async listInstalledTitles(signal?: AbortSignal): Promise<MtpInstalledListing> {
+    const script = readScript(INSTALLED_SCRIPT, { scriptsDir: this.scriptsDir });
+    const result = await this.runFn({ script, timeoutMs: 60_000, signal });
+    if (result.code !== 0) throw appError('MTP_NOT_CONNECTED', scriptMessage(result), { retryable: true });
+    const line = result.stdout.trim().split(/\r?\n/).at(-1);
+    let payload: unknown;
+    try { payload = JSON.parse(line ?? ''); } catch {
+      throw appError('MTP_NOT_CONNECTED', 'Could not parse DBI Installed games listing.', { retryable: true });
+    }
+    if (!payload || typeof payload !== 'object')
+      throw appError('MTP_NOT_CONNECTED', 'Invalid DBI Installed games listing.', { retryable: true });
+    const row = payload as Record<string, unknown>;
+    if (!['ready', 'partial', 'unavailable'].includes(String(row.state)) || !Array.isArray(row.files)
+      || row.files.length > 20_000 || !row.files.every((item) => item && typeof item === 'object'
+        && typeof item.folder_name === 'string' && typeof item.file_name === 'string'))
+      throw appError('MTP_NOT_CONNECTED', 'Invalid DBI Installed games listing.', { retryable: true });
+    return {
+      state: row.state as MtpInstalledListing['state'],
+      deviceId: typeof row.device_id === 'string' ? row.device_id : null,
+      files: row.files.map((item) => ({ folderName: item.folder_name as string, fileName: item.file_name as string })),
+      unidentifiedFiles: Number.isSafeInteger(row.unidentified_files) && Number(row.unidentified_files) >= 0
+        ? Number(row.unidentified_files) : 0,
+      message: typeof row.message === 'string' ? row.message : null,
+    };
   }
 
   async copyFile(input: MtpCopyInput, signal?: AbortSignal): Promise<void> {
@@ -231,15 +259,17 @@ interface RawStorageRow {
   free_bytes?: unknown;
   total_bytes?: unknown;
   path?: unknown;
+  device_id?: unknown;
 }
 
 /**
  * Parses the script's trailing JSON line. `null` signals unparseable output;
  * an empty array means "no Switch attached", which is not an error.
  */
-function parseStoragePayload(stdout: string): MtpStorageDestination[] | null {
+function parseStoragePayload(stdout: string): { storages: MtpStorageDestination[];
+  deviceId: string | null; deviceCount: number } | null {
   const output = stdout.trim();
-  if (!output) return [];
+  if (!output) return { storages: [], deviceId: null, deviceCount: 0 };
   const lines = output.split(/\r?\n/);
   let payload: unknown;
   try {
@@ -249,10 +279,14 @@ function parseStoragePayload(stdout: string): MtpStorageDestination[] | null {
   }
   const items: unknown[] = Array.isArray(payload) ? payload : [payload];
   const storages: MtpStorageDestination[] = [];
+  const deviceIds = new Set<string>();
+  let deviceMarkers = 0;
   for (const item of items) {
     if (typeof item !== 'object' || item === null) continue;
     const row = item as RawStorageRow;
+    if (typeof row.device_id === 'string' && row.device_id.trim()) deviceIds.add(row.device_id);
     const name = typeof row.name === 'string' ? row.name.trim() : '';
+    if (!name && typeof row.device_id === 'string') deviceMarkers++;
     const destination = destinationForStorageName(normalizeStorageName('', name));
     if (!destination) continue;
     const freeBytes = toPositiveBytes(row.free_bytes);
@@ -267,5 +301,8 @@ function parseStoragePayload(stdout: string): MtpStorageDestination[] | null {
       totalBytes,
     });
   }
-  return storages;
+  const deviceCount = Math.max(deviceMarkers, deviceIds.size);
+  return { storages: deviceCount > 1 ? [] : storages,
+    deviceId: deviceCount === 1 && deviceIds.size === 1 ? [...deviceIds][0] : null,
+    deviceCount };
 }

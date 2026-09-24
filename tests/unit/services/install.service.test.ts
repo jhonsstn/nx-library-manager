@@ -16,13 +16,13 @@ import type {
 } from '@main/mtp/mtp.adapter';
 import { getBaseFile, upsertBaseGameFile } from '@main/repositories/game-files.repository';
 import { upsertGameByCleanedTitle } from '@main/repositories/games.repository';
-import { getInstallJob, insertInstallJob, listJobsByStatus, updateInstallJob } from '@main/repositories/install-jobs.repository';
+import { getInstallJob, insertInstallJob, latestCompletedInstall, listJobsByStatus, updateInstallJob } from '@main/repositories/install-jobs.repository';
 import { getUpdate, listAllUpdates, upsertUpdate } from '@main/repositories/updates.repository';
 import { recordInspection } from '@main/repositories/title-catalog.repository';
 import { detectVersion } from '@main/scanner/filename-parser';
 import { InstallService } from '@main/services/install.service';
 import { defaultAppSettings } from '@shared/schemas/settings';
-import type { InstallJobDto } from '@shared/types/domain';
+import type { InstallJobDto, MtpInventoryDto } from '@shared/types/domain';
 import type { AppSettings } from '@shared/types/settings';
 
 const BASE_NAME = 'Hades.nsp';
@@ -86,6 +86,11 @@ class FakeMtpAdapter implements MtpAdapter {
     };
   }
 
+  async listInstalledTitles() {
+    return { state: 'unavailable' as const, deviceId: null, files: [],
+      unidentifiedFiles: 0, message: 'No installed-games view.' };
+  }
+
   async copyFile(input: MtpCopyInput): Promise<void> {
     this.started.push(input.fileName);
     this.active += 1;
@@ -143,6 +148,7 @@ function createService(
   options: {
     freeSpace?: (folder: string) => Promise<number | null>;
     onJobChanged?: (job: InstallJobDto) => void;
+    inventory?: () => MtpInventoryDto;
   } = {},
 ): InstallService {
   return new InstallService({
@@ -151,6 +157,7 @@ function createService(
     settings: { getFull: () => settings },
     onJobChanged: options.onJobChanged,
     freeSpace: options.freeSpace,
+    inventory: options.inventory,
   });
 }
 
@@ -163,6 +170,26 @@ function writeSource(name: string, sizeBytes: number): string {
 function seedGame(title: string): number {
   return upsertGameByCleanedTitle(db, { displayTitle: title, cleanedTitle: title });
 }
+
+describe('install history cleanup', () => {
+  it('deletes finished entries while retaining pending and running transfers', () => {
+    const gameId = seedGame('History game');
+    const ids = ['completed', 'failed', 'cancelled', 'pending', 'running'].map((status, index) => {
+      const id = insertInstallJob(db, { gameId, sourcePath: `C:/games/${index}.nsp`,
+        destinationFolder: 'shell:::sd', destinationLabel: 'SD install', destinationType: 'mtp-sd',
+        fileName: `${index}.nsp`, fileSize: 100, fileKind: 'base', detectedVersion: '', rawVersion: 0 });
+      if (status !== 'pending') updateInstallJob(db, id, { status: status as InstallJobDto['status'] });
+      return id;
+    });
+    expect(latestCompletedInstall(db, gameId)?.id).toBe(ids[0]);
+
+    const service = createService();
+    expect(service.clearHistory()).toBe(3);
+    expect(service.getJobs().map((job) => job.status).sort()).toEqual(['pending', 'running']);
+    expect(latestCompletedInstall(db, gameId)).toBeNull();
+    expect(service.clearHistory()).toBe(0);
+  });
+});
 
 function seedBase(gameId: number, name: string, sizeBytes: number): { id: number; path: string } {
   const path = writeSource(name, sizeBytes);
@@ -716,5 +743,79 @@ describe('install service shutdown', () => {
     expect(getInstallJob(db, jobs[1].id)!.status).toBe('pending');
     expect(getInstallJob(db, jobs[2].id)!.status).toBe('pending');
     expect(adapter.started).toEqual([BASE_NAME]);
+  });
+});
+
+describe('Switch inventory install review', () => {
+  it('does not automatically retry a failed MTP job that is now on the Switch', async () => {
+    const { gameId, base } = seedLibrary();
+    recordInspection(db, { path: base.path, size: 1000, mtime: 1, parserVersion: 1,
+      keysRevision: 1, error: null, titles: [{ titleId: '0100AABBCCDD0000',
+        baseTitleId: '0100AABBCCDD0000', type: 'base', rawVersion: 0,
+        name: null, publisher: null, source: 'cnmt' }] });
+    const id = insertInstallJob(db, { gameId, sourcePath: base.path,
+      destinationFolder: SD_STORAGE.shellPath, destinationLabel: SD_STORAGE.label,
+      destinationType: 'mtp-sd', fileName: BASE_NAME, fileSize: 1000,
+      fileKind: 'base', detectedVersion: '', rawVersion: 0 });
+    updateInstallJob(db, id, { status: 'failed', error: { code: 'MTP_COPY_FAILED', message: 'timeout' } });
+    const inventory: MtpInventoryDto = { state: 'ready', deviceId: 'switch-1', revision: 1,
+      checkedAt: new Date().toISOString(), unidentifiedFiles: 0, message: null,
+      titles: [{ titleId: '0100AABBCCDD0000', type: 'base', rawVersion: 0 }] };
+    const service = createService({ inventory: () => inventory });
+    expect(await service.retryFailed()).toEqual([]);
+    expect(service.getJobs()).toHaveLength(1);
+  });
+
+  it('suggests only the newest verified patch and missing local DLC, then checks the revision', async () => {
+    const { gameId, base, early, late, dlc } = seedLibrary();
+    adapter.storages = [SD_STORAGE];
+    for (const [item, type, id, version, size] of [
+      [base, 'base', '0100AABBCCDD0000', 0, 1000],
+      [early, 'update', '0100AABBCCDD0800', 131072, 2000],
+      [late, 'update', '0100AABBCCDD0800', 262144, 3000],
+      [dlc, 'dlc', '0100AABBCCDD1001', 65536, 4000],
+    ] as const) recordInspection(db, { path: item.path, size, mtime: 1, parserVersion: 1,
+      keysRevision: 1, error: null, titles: [{ titleId: id, baseTitleId: '0100AABBCCDD0000',
+        type, rawVersion: version, name: null, publisher: null, source: 'cnmt' }] });
+    let inventory: MtpInventoryDto = { state: 'ready', deviceId: 'switch-1', revision: 7,
+      checkedAt: new Date().toISOString(), unidentifiedFiles: 0, message: null, titles: [
+        { titleId: '0100AABBCCDD0000', type: 'base', rawVersion: 0 },
+        { titleId: '0100AABBCCDD0800', type: 'update', rawVersion: 131072 },
+      ] };
+    const service = createService({ inventory: () => inventory });
+    const preview = service.preview({ gameId, mode: 'suggested' });
+    expect(preview.items.map((item) => [item.fileName, item.assessment, item.selectedByDefault])).toEqual([
+      [BASE_NAME, 'already-installed', false],
+      [EARLY_UPDATE_NAME, 'older-update', false],
+      [LATE_UPDATE_NAME, 'needed', true],
+      [DLC_NAME, 'needed', true],
+    ]);
+    inventory = { ...inventory, revision: 8 };
+    await expect(service.create({ gameId, updateIds: [late.id, dlc.id], includeBaseFile: false,
+      destination: MTP_DESTINATION(), inventoryRevision: preview.inventoryRevision }))
+      .rejects.toThrow(/inventory changed/);
+    expect(service.getJobs()).toHaveLength(0);
+    const jobs = await service.create({ gameId, updateIds: [late.id, dlc.id], includeBaseFile: false,
+      destination: MTP_DESTINATION(), inventoryRevision: inventory.revision });
+    expect(jobs.map((job) => job.displayName)).toEqual([LATE_UPDATE_NAME, DLC_NAME]);
+    await service.whenIdle();
+  });
+
+  it('requires deliberate selection for an already installed or unverified package', async () => {
+    const { gameId, base } = seedLibrary();
+    adapter.storages = [SD_STORAGE];
+    recordInspection(db, { path: base.path, size: 1000, mtime: 1, parserVersion: 1,
+      keysRevision: 1, error: null, titles: [{ titleId: '0100AABBCCDD0000',
+        baseTitleId: '0100AABBCCDD0000', type: 'base', rawVersion: 0,
+        name: null, publisher: null, source: 'cnmt' }] });
+    let inventory: MtpInventoryDto = { state: 'ready', deviceId: 'switch-1', revision: 3,
+      checkedAt: new Date().toISOString(), unidentifiedFiles: 0, message: null,
+      titles: [{ titleId: '0100AABBCCDD0000', type: 'base', rawVersion: 0 }] };
+    const service = createService({ inventory: () => inventory });
+    await expect(service.create({ gameId, updateIds: [], destination: MTP_DESTINATION(),
+      inventoryRevision: 3 })).rejects.toThrow(/already installed/);
+    inventory = { ...inventory, state: 'partial', revision: 4, titles: [] };
+    await expect(service.create({ gameId, updateIds: [], destination: MTP_DESTINATION(),
+      inventoryRevision: 4 })).rejects.toThrow(/unverified install/);
   });
 });

@@ -10,6 +10,7 @@ export interface GameListProps {
   onSelect: (gameId: number) => void;
   onContextMenu: (event: MouseEvent<HTMLElement>, game: GameSummaryDto) => void;
   emptyMessage: string;
+  inventoryReady?: boolean;
 }
 
 const SKELETON_ROWS = 6;
@@ -29,6 +30,7 @@ export function GameList({
   onSelect,
   onContextMenu,
   emptyMessage,
+  inventoryReady = false,
 }: GameListProps) {
   if (loading) {
     return (
@@ -66,7 +68,17 @@ export function GameList({
           game.hasNewerUpdate ? 'Latest known update file is missing' : null,
           game.hasCleanableUpdates ? 'Older tracked update files can be cleaned' : null,
         ].filter((status): status is string => status !== null);
-        const statusDescriptionId = updateStatuses.length ? `game-update-status-${game.id}` : undefined;
+        const switchText = inventoryReady && game.switchStatus ? [
+          game.switchStatus.base === 'installed' ? 'Base game on Switch'
+            : game.switchStatus.base === 'not-installed' ? 'Base game absent from Switch'
+              : 'Base game status unknown',
+          game.switchStatus.update === 'installed' ? 'Update on Switch'
+            : game.switchStatus.update === 'not-installed' ? 'Update absent from Switch'
+              : 'Update status unknown',
+          game.switchStatus.localContentReady ? 'Local content ready to install' : 'No newer local content to install',
+        ].join('; ') : null;
+        const description = [...updateStatuses, ...(switchText ? [switchText] : [])];
+        const descriptionId = description.length ? `game-update-status-${game.id}` : undefined;
         return (
           <button
             key={game.id}
@@ -74,7 +86,7 @@ export function GameList({
             role="option"
             aria-selected={selected}
             aria-label={game.displayTitle}
-            aria-describedby={statusDescriptionId}
+            aria-describedby={descriptionId}
             className={`list__item library-row${selected ? ' is-selected' : ''}${
               game.favorite ? ' is-favorite' : ''
             }`}
@@ -98,9 +110,12 @@ export function GameList({
                 <span className="library-row__status library-row__status--cleanup"
                   title="Older tracked update files can be cleaned" aria-hidden="true" />
               ) : null}
+              {switchText ? <span className={`library-row__switch library-row__switch--${
+                game.switchStatus?.localContentReady ? 'needs-content' : game.switchStatus?.base ?? 'unknown'}`}
+                title={switchText} aria-hidden="true">S</span> : null}
             </span>
-            {statusDescriptionId ? (
-              <span id={statusDescriptionId} className="sr-only">{updateStatuses.join('. ')}</span>
+            {descriptionId ? (
+              <span id={descriptionId} className="sr-only">{description.join('. ')}</span>
             ) : null}
           </button>
         );

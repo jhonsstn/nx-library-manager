@@ -54,6 +54,16 @@ export function useMtpStatus() {
   });
 }
 
+export function useMtpInventory(enabled = true) {
+  return useQuery({ queryKey: queryKeys.mtpInventory(), queryFn: () => getCatalogApi().mtp.getInventory(), enabled });
+}
+
+export function useRefreshMtpInventory() {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: () => getCatalogApi().mtp.refreshInventory(),
+    onSuccess: (inventory) => queryClient.setQueryData(queryKeys.mtpInventory(), inventory) });
+}
+
 export function useHttpServerStatus() {
   return useQuery({
     queryKey: queryKeys.httpServerStatus(),
@@ -61,8 +71,9 @@ export function useHttpServerStatus() {
   });
 }
 
-export function useInstallJobs() {
-  return useQuery({ queryKey: queryKeys.installJobs(), queryFn: () => getCatalogApi().install.list() });
+export function useInstallJobs(refetchInterval?: number) {
+  return useQuery({ queryKey: queryKeys.installJobs(), queryFn: () => getCatalogApi().install.list(),
+    refetchInterval });
 }
 
 export function useAppVersion() {
@@ -255,6 +266,7 @@ export function useInstallMutations() {
       onSuccess: invalidate,
     }),
     retryFailed: useMutation({ mutationFn: () => getCatalogApi().install.retryFailed(), onSuccess: invalidate }),
+    clearHistory: useMutation({ mutationFn: () => getCatalogApi().install.clearHistory(), onSuccess: invalidate }),
   };
 }
 

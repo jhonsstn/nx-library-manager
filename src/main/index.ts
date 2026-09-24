@@ -146,18 +146,20 @@ function bootstrap(): void {
 
   const versions = new VersionService({ db, paths, logger: logger.child('versions') });
   versions.loadCached();
-  const catalog = new CatalogService({
-    db,
-    versions,
-    settings: () => settings.getFull(),
-    logger: logger.child('catalog'),
-  });
   const mtpAdapter = new PowerShellMtpAdapter({ scriptsDir: resolveScriptsDir() });
   const mtp = new MtpService({
     adapter: mtpAdapter,
     logger: logger.child('mtp'),
     pollIntervalMs: MTP_STATUS_REFRESH_MS,
     onStatusChanged: (status) => emit(EVENTS.mtpStatusChanged, status),
+    onInventoryChanged: (inventory) => emit(EVENTS.mtpInventoryChanged, inventory),
+  });
+  const catalog = new CatalogService({
+    db,
+    versions,
+    settings: () => settings.getFull(),
+    inventory: () => mtp.getInventory(),
+    logger: logger.child('catalog'),
   });
   const httpServer = new HttpServerService({
     db,
@@ -172,6 +174,8 @@ function bootstrap(): void {
     settings: { getFull: () => settings.getFull() },
     logger: logger.child('install'),
     onJobChanged: (job) => emit(EVENTS.installChanged, job),
+    inventory: () => mtp.getInventory(),
+    onMtpBatchFinished: () => { void mtp.refreshInventory(); },
   });
   const files = new FileService({ db, logger: logger.child('files') });
   const metadata = new MetadataService({

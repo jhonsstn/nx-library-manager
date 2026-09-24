@@ -1,19 +1,23 @@
 import { z } from 'zod';
 import { EVENTS, IPC } from '../../shared/contracts/ipc';
-import { CreateInstallInputSchema } from '../../shared/schemas/inputs';
+import { CreateInstallInputSchema, PreviewInstallInputSchema } from '../../shared/schemas/inputs';
 import { handle } from './handle';
 import type { IpcDeps } from './deps';
 
 export function registerInstallIpc(deps: IpcDeps): void {
+  handle(IPC.install.preview, z.tuple([PreviewInstallInputSchema]), (input) => deps.install.preview(input));
   handle(IPC.install.create, z.tuple([CreateInstallInputSchema]), (input) => deps.install.create(input));
   handle(IPC.install.cancel, z.tuple([z.number().int().positive()]), (jobId) => deps.install.cancel(jobId));
   handle(IPC.install.retryFailed, z.tuple([]), () => deps.install.retryFailed());
   handle(IPC.install.list, z.tuple([]), () => deps.install.getJobs());
+  handle(IPC.install.clearHistory, z.tuple([]), () => deps.install.clearHistory());
 }
 
 export function registerMtpIpc(deps: IpcDeps): void {
   handle(IPC.mtp.getStatus, z.tuple([]), () => deps.mtp.getStatus());
   handle(IPC.mtp.refresh, z.tuple([]), () => deps.mtp.getStatus({ refresh: true }));
+  handle(IPC.mtp.getInventory, z.tuple([]), () => deps.mtp.getInventory());
+  handle(IPC.mtp.refreshInventory, z.tuple([]), () => deps.mtp.refreshInventory());
 }
 
 /** Wires the queue's change events to the renderer event channel. */

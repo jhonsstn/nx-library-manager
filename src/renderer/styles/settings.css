@@ -73,6 +73,26 @@
   border-radius: var(--radius);
 }
 
+.install-preview__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.install-preview__item span:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.install-preview__item small {
+  display: block;
+  color: var(--text-muted);
+}
+
 .install-plan__item {
   display: flex;
   align-items: center;
@@ -105,6 +125,30 @@
   color: var(--text-muted);
 }
 
+.install-batch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.install-batch p {
+  margin: 0;
+}
+
+.install-batch__file {
+  overflow-wrap: anywhere;
+}
+
+.install-batch__confirmed {
+  color: var(--success);
+}
+
+.install-batch__footer {
+  margin-top: var(--space-2);
+  align-items: center;
+}
+
 .install-warning {
   color: var(--warning);
   font-size: var(--font-size-sm);
@@ -130,6 +174,24 @@
 .install-tray__title {
   font-size: var(--font-size);
   font-weight: 600;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.install-tray__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.install-tray__history {
+  margin-top: var(--space-3);
+}
+
+.install-tray__history summary {
+  cursor: pointer;
   color: var(--text-muted);
   margin-bottom: var(--space-2);
 }

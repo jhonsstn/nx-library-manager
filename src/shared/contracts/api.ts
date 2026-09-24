@@ -5,10 +5,12 @@ import type {
   GameSummaryDto,
   HttpServerStatusDto,
   InstallJobDto,
+  InstallPreviewDto,
   JobStartedDto,
   MetadataBulkProgressDto,
   MetadataCandidateDto,
   MtpStatusDto,
+  MtpInventoryDto,
   PagedResult,
   ScanCompletedDto,
   ScanProgressDto,
@@ -26,6 +28,7 @@ export interface ListGamesInput {
   favoritesOnly?: boolean;
   needsReview?: boolean;
   needsUpdate?: boolean;
+  readyToInstall?: boolean;
   hiddenOnly?: boolean;
   sort?: 'title-asc' | 'title-desc' | 'added-desc';
   limit?: number;
@@ -58,6 +61,16 @@ export interface CreateInstallInput {
   /** Defaults to true when `gameId` is provided. */
   includeBaseFile?: boolean;
   destination: InstallDestination;
+  inventoryRevision?: number;
+  allowAlreadyInstalled?: boolean;
+  allowUnverified?: boolean;
+}
+
+export interface PreviewInstallInput {
+  gameId: number;
+  updateIds?: number[];
+  includeBaseFile?: boolean;
+  mode: 'suggested' | 'selected';
 }
 
 export type DeleteFileInput = { kind: 'game'; gameId: number } | { kind: 'update'; updateId: number };
@@ -117,17 +130,22 @@ export interface SwitchCatalogApi {
   };
 
   install: {
+    preview(input: PreviewInstallInput): Promise<InstallPreviewDto>;
     create(input: CreateInstallInput): Promise<InstallJobDto[]>;
     cancel(jobId: number): Promise<void>;
     retryFailed(): Promise<InstallJobDto[]>;
     list(): Promise<InstallJobDto[]>;
+    clearHistory(): Promise<number>;
     onChanged(listener: (event: InstallJobDto) => void): Promise<() => void>;
   };
 
   mtp: {
     getStatus(): Promise<MtpStatusDto>;
     refresh(): Promise<MtpStatusDto>;
+    getInventory(): Promise<MtpInventoryDto>;
+    refreshInventory(): Promise<MtpInventoryDto>;
     onStatusChanged(listener: (event: MtpStatusDto) => void): Promise<() => void>;
+    onInventoryChanged(listener: (event: MtpInventoryDto) => void): Promise<() => void>;
   };
 
   httpServer: {

@@ -7,7 +7,7 @@ import {
   releasedVersionLabel,
   versionLabel,
 } from '@shared/format/versions';
-import type { GameDetailsDto, UpdateCleanupPreviewDto, UpdateFileDto, UpdateGroupName } from '@shared/types/domain';
+import type { GameDetailsDto, KnownDlcDto, UpdateCleanupPreviewDto, UpdateFileDto, UpdateGroupName } from '@shared/types/domain';
 import { Cover } from '@renderer/components/Cover';
 import { ErrorText, Skeleton } from '@renderer/components/Feedback';
 import { ConfirmDialog } from '@renderer/components/Modal';
@@ -23,6 +23,8 @@ import {
   useSetNeedsReview,
   useSetHidden,
   useUnmatchUpdates,
+  useMtpInventory,
+  useRefreshMtpInventory,
 } from '@renderer/query/hooks';
 import { ScreenshotViewer } from './ScreenshotViewer';
 import { TrailerDialog } from './TrailerDialog';
@@ -53,6 +55,24 @@ function compactFileName(fileName: string): string {
     .trim();
 }
 
+function dlcRow(item: KnownDlcDto, showSwitch: boolean) {
+  return <li className="details__dlc-row" key={item.titleId}>
+    <span className="details__dlc-name">{item.name}<small>
+      {item.nameSource === 'title-id' ? 'Name unavailable' : `${item.titleId} · ${
+        item.nameSource === 'filename' ? 'Filename' : item.nameSource === 'package'
+          ? 'Package metadata' : 'TitleDB'}`}
+    </small></span>
+    {showSwitch ? <span className={`badge ${item.switchStatus === 'installed' ? 'badge--ok'
+      : item.switchStatus === 'not-installed' ? 'badge--update' : ''}`}>
+      {item.switchStatus === 'installed' ? 'On Switch' : item.switchStatus === 'not-installed'
+        ? 'Not installed' : 'Switch unknown'}
+    </span> : null}
+    <span className={`badge ${item.filePresent ? 'badge--ok' : ''}`}>
+      {item.filePresent ? 'Library file' : 'No library file'}
+    </span>
+  </li>;
+}
+
 /**
  * Right-hand details pane. Ports `ui.load_game`, `update_install_estimate`,
  * `installed_status_text`, `open_screenshot` and `open_trailer`: cover, metadata,
@@ -68,10 +88,13 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
   const unmatchUpdates = useUnmatchUpdates();
   const deleteFile = useFileMutations().deleteFile;
   const cleanOldUpdates = useFileMutations().cleanOldUpdates;
+  const inventory = useMtpInventory();
+  const refreshInventory = useRefreshMtpInventory();
   const { open: openUpdateMenu, element: updateMenuElement } = useContextMenu();
 
   const [selectedUpdateIds, setSelectedUpdateIds] = useState<number[]>([]);
   const [installIds, setInstallIds] = useState<number[] | null>(null);
+  const [suggestedInstall, setSuggestedInstall] = useState(false);
   const [deleteIds, setDeleteIds] = useState<number[] | null>(null);
   const [cleanupPreview, setCleanupPreview] = useState<UpdateCleanupPreviewDto | null>(null);
   const [trailerOpen, setTrailerOpen] = useState(false);
@@ -80,6 +103,7 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
   useEffect(() => {
     setSelectedUpdateIds([]);
     setInstallIds(null);
+    setSuggestedInstall(false);
     setDeleteIds(null);
     setCleanupPreview(null);
     setTrailerOpen(false);
@@ -132,6 +156,29 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
             : 'Update status unknown';
   const knownDlc = [...(details.knownDlc ?? [])].sort((a, b) => Number(a.filePresent) - Number(b.filePresent));
   const missingDlcCount = knownDlc.filter((item) => !item.filePresent).length;
+  const knownDlcWithFile = knownDlc.filter((item) => item.filePresent);
+  const knownDlcWithoutFile = knownDlc.filter((item) => !item.filePresent);
+  const showSwitch = Boolean(inventory.data?.deviceId);
+  const showDlcInSwitch = inventory.data?.state === 'ready' || inventory.data?.state === 'partial';
+  const dlcDetails = <>
+    {knownDlc.length ? <div className="details__known-dlc">
+      <div className="details__subheading">
+        <h4>Known DLC</h4>
+        <span>{knownDlc.length} listed{missingDlcCount ? ` · ${missingDlcCount} without a library file` : ''}</span>
+      </div>
+      {knownDlcWithFile.length ? <ul className="details__dlc-list">
+        {knownDlcWithFile.map((item) => dlcRow(item, showSwitch))}</ul> : null}
+      {knownDlcWithoutFile.length ? <>
+        <h5>Known DLC without a library file</h5>
+        <ul className="details__dlc-list">{knownDlcWithoutFile.map((item) => dlcRow(item, showSwitch))}</ul>
+      </> : null}
+      <p className="details__source-note">DLC IDs: TitleDB · updated {details.knownDlcRefreshedAt?.slice(0, 10) ?? 'unknown date'} · listed DLC does not imply ownership</p>
+    </div> : null}
+    {details.localDlc?.length ? <div className="details__known-dlc">
+      <h4>Other local DLC</h4>
+      <ul className="details__dlc-list">{details.localDlc.map((item) => dlcRow(item, showSwitch))}</ul>
+    </div> : null}
+  </>;
 
   const toggleFavorite = () => {
     setFavorite.mutate(
@@ -261,6 +308,41 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
               </span>
             )}
           </div>
+          {showSwitch ? <section className="details__switch" aria-label="On this Switch">
+            <div className="row row--wrap">
+              <h3>On this Switch</h3>
+              <Button onClick={() => refreshInventory.mutate()} disabled={inventory.data?.state === 'scanning'}>
+                Refresh
+              </Button>
+            </div>
+            {inventory.data?.state === 'scanning' ? <p>Checking Switch installed content…</p>
+              : inventory.data?.state === 'unavailable' || inventory.data?.state === 'error'
+                ? <p>Switch inventory unavailable: {inventory.data.message ?? 'Open DBI MTP Installed games.'}</p>
+                : <>
+                  {inventory.data?.state === 'partial' ? <p className="install-warning">
+                    Some DBI entries could not be identified. Absence cannot be confirmed.
+                  </p> : null}
+                  <p>Base game: {details.switchStatus?.base === 'installed' ? 'Installed'
+                    : details.switchStatus?.base === 'not-installed' ? 'Not installed' : 'Unknown'}</p>
+                  <p>Update: {details.switchStatus?.update === 'installed'
+                    ? details.switchStatus.updateVersion === null ? 'Installed, version unknown'
+                      : `Installed ${versionLabel(details.switchStatus.updateVersion)}`
+                    : details.switchStatus?.update === 'not-installed' ? 'Not installed' : 'Unknown'}</p>
+                  <p>Library update: {localVersion > 0 ? versionLabel(localVersion) : 'No verified update file'}
+                    {' · '}Latest released: {details.versionStatus.latest
+                      ? releasedVersionLabel(details.versionStatus.latest.version, details.versionStatus.latest.releaseDate)
+                      : 'Unknown'}</p>
+                  {showDlcInSwitch ? dlcDetails : null}
+                  {details.switchStatus?.localContentReady ? <Button variant="primary"
+                    onClick={() => setSuggestedInstall(true)}>Install missing local content</Button> : null}
+                  <small className="dim">DBI MTP · checked {inventory.data?.checkedAt ?? 'unknown time'}</small>
+                  {details.installed?.source === 'install-history'
+                    && typeof details.switchStatus?.updateVersion === 'number'
+                    && localVersion > details.switchStatus.updateVersion ? <small className="dim">
+                      If you just installed this update, restart DBI MTP responder and Refresh; its installed-games list may be cached.
+                    </small> : null}
+                </>}
+          </section> : null}
           {details.baseFile ? (
             <p className="details__file-summary" title={details.baseFile.filePath}>
               Base file · {details.baseFile.fileType} · {formatBytes(details.baseFile.fileSize)} · {details.baseFile.fileName}
@@ -286,25 +368,7 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
 
       <section aria-label="DLC and updates">
         <h3 className="details__section-title">Updates and DLC</h3>
-        {knownDlc.length ? <div className="details__known-dlc">
-          <div className="details__subheading">
-            <h4>Known DLC</h4>
-            <span>{knownDlc.length} listed{missingDlcCount ? ` · ${missingDlcCount} file${missingDlcCount === 1 ? '' : 's'} missing` : ''}</span>
-          </div>
-          <ul className="details__dlc-list">{knownDlc.map((item) => (
-            <li className="details__dlc-row" key={item.titleId}>
-              <span className="details__dlc-name">{item.name}<small>
-                {item.nameSource === 'title-id' ? 'Name unavailable' : `${item.titleId} · ${
-                  item.nameSource === 'filename' ? 'Filename' : item.nameSource === 'package'
-                    ? 'Package metadata' : 'TitleDB'}`}
-              </small></span>
-              <span className={`badge ${item.filePresent ? 'badge--ok' : 'badge--update'}`}>
-                {item.filePresent ? 'File present' : 'File missing'}
-              </span>
-            </li>
-          ))}</ul>
-          <p className="details__source-note">DLC IDs: TitleDB · updated {details.knownDlcRefreshedAt?.slice(0, 10) ?? 'unknown date'} · file status refers to this library</p>
-        </div> : null}
+        {!showDlcInSwitch ? dlcDetails : null}
         <div className="details__subheading details__subheading--local">
           <h4>Local files</h4>
           <span>{details.updates.length} update/DLC file{details.updates.length === 1 ? '' : 's'}</span>
@@ -414,6 +478,8 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
       {installIds ? (
         <InstallDialog gameId={details.id} updateIds={installIds} onClose={() => setInstallIds(null)} />
       ) : null}
+      {suggestedInstall ? <InstallDialog gameId={details.id} suggested
+        onClose={() => setSuggestedInstall(false)} /> : null}
       {screenshotIndex !== null ? (
         <ScreenshotViewer
           screenshots={screenshots}

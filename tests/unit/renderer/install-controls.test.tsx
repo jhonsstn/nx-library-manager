@@ -235,9 +235,21 @@ describe('InstallQueueTray', () => {
 
     expect(await screen.findByText('Install to SD.nsp')).toBeTruthy();
     const row = screen.getByText('Install to SD.nsp').closest('li') as HTMLElement;
-    expect(within(row).getByText('Running')).toBeTruthy();
+    expect(within(row).getByText('Copying to Switch')).toBeTruthy();
     expect(within(row).getByText('SD install')).toBeTruthy();
     expect(row.textContent).not.toContain('0%');
+  });
+
+  it('does not present a finished MTP copy step as 100% installed', async () => {
+    renderWithProviders(<InstallQueueTray />, { handlers: { [IPC.install.list]: () => [job({
+      id: 2, displayName: 'Small DLC.nsp', destinationType: 'mtp-sd',
+      status: 'completed', sizeBytes: 1024, transferredBytes: 1024,
+    })] } });
+    await userEvent.setup().click(await screen.findByText('Finished history (1)'));
+    const row = (await screen.findByText('Small DLC.nsp')).closest('li') as HTMLElement;
+    expect(within(row).getByText('Copy step finished')).toBeTruthy();
+    expect(row.textContent).toContain('Check “On this Switch”');
+    expect(row.querySelector('[role="progressbar"]')).toBeNull();
   });
 
   it('cancels pending jobs and retries failed ones', async () => {
@@ -271,10 +283,55 @@ describe('InstallQueueTray', () => {
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(cancelled).toEqual([5]));
 
+    await userEvent.setup().click(screen.getByText('Finished history (1)'));
     await userEvent.setup().click(screen.getByRole('button', { name: 'Retry failed' }));
     await waitFor(() => expect(retries).toBe(1));
 
     expect(screen.getByText('The device disconnected.')).toBeTruthy();
+  });
+
+  it('collapses finished jobs and clears only history after confirmation', async () => {
+    const user = userEvent.setup();
+    const jobs = [
+      job({ id: 8, displayName: 'Queued.nsp', status: 'pending' }),
+      job({ id: 7, displayName: 'Done.nsp', status: 'completed' }),
+    ];
+    let cleared = 0;
+    renderWithProviders(<InstallQueueTray />, { handlers: {
+      [IPC.install.list]: () => jobs,
+      [IPC.install.clearHistory]: () => {
+        cleared += 1;
+        jobs.splice(1);
+        return 1;
+      },
+    } });
+    expect(await screen.findByText('Queued.nsp')).toBeTruthy();
+    const history = screen.getByText('Finished history (1)').closest('details') as HTMLDetailsElement;
+    expect(history.open).toBe(false);
+    expect(screen.queryByText('Done.nsp')).toBeNull();
+    expect(screen.queryByText('No active installs.')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Clear history' }));
+    const dialog = screen.getByRole('dialog', { name: 'Clear install history' });
+    expect(within(dialog).getByText(/Last app transfer/)).toBeTruthy();
+    expect(cleared).toBe(0);
+    await user.click(within(dialog).getByRole('button', { name: 'Clear history' }));
+    await waitFor(() => expect(cleared).toBe(1));
+    await waitFor(() => expect(screen.queryByText('Finished history (1)')).toBeNull());
+    expect(screen.getByText('Queued.nsp')).toBeTruthy();
+  });
+
+  it('renders finished history in bounded pages when expanded', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<InstallQueueTray />, { handlers: { [IPC.install.list]: () =>
+      Array.from({ length: 26 }, (_, index) => job({ id: index + 1,
+        displayName: `Done ${index + 1}.nsp`, status: 'completed' })) } });
+    expect(await screen.findByText('Finished history (26)')).toBeTruthy();
+    expect(screen.queryByText('Done 1.nsp')).toBeNull();
+    await user.click(screen.getByText('Finished history (26)'));
+    await screen.findByText('Done 1.nsp');
+    expect(screen.queryByText('Done 26.nsp')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Show more' }));
+    expect(await screen.findByText('Done 26.nsp')).toBeTruthy();
   });
 
   it('renders nothing when the queue is empty', async () => {

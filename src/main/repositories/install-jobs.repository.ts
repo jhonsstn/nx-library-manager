@@ -159,6 +159,11 @@ export function listInstallJobs(db: AppDatabase, options: { limit?: number } = {
   return rows.map(toInstallJobDto);
 }
 
+/** Removes finished queue entries; a pending or running transfer is never touched. */
+export function clearFinishedInstallJobs(db: AppDatabase): number {
+  return db.prepare("DELETE FROM install_jobs WHERE status IN ('completed', 'failed', 'cancelled')").run().changes;
+}
+
 export function listJobsByStatus(db: AppDatabase, statuses: InstallJobStatus[]): InstallJobDto[] {
   if (statuses.length === 0) return [];
   const placeholders = statuses.map(() => '?').join(',');

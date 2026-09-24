@@ -39,6 +39,7 @@ export const IPC = {
     cancel: 'install:cancel',
     retryFailed: 'install:retryFailed',
     list: 'install:list',
+    clearHistory: 'install:clearHistory',
   },
   mtp: {
     getStatus: 'mtp:getStatus',

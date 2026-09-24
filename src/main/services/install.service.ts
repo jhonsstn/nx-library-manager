@@ -16,6 +16,7 @@ import type { Logger } from '../lifecycle/logger';
 import type { MtpAdapter, MtpStorageDestination, MtpTransferState } from '../mtp/mtp.adapter';
 import { getBaseFile } from '../repositories/game-files.repository';
 import {
+  clearFinishedInstallJobs,
   getInstallJob,
   insertInstallJob,
   listInstallJobs,
@@ -253,6 +254,12 @@ export class InstallService {
 
   getJobs(): InstallJobDto[] {
     return listInstallJobs(this.db);
+  }
+
+  clearHistory(): number {
+    const deleted = clearFinishedInstallJobs(this.db);
+    this.logger?.info('install.historyCleared', { deleted });
+    return deleted;
   }
 
   /**

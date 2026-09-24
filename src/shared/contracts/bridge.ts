@@ -119,6 +119,7 @@ export function createSwitchCatalogApi(bridge: IpcBridge): SwitchCatalogApi {
       cancel: (jobId) => call<void>(IPC.install.cancel, [jobId]),
       retryFailed: () => call<InstallJobDto[]>(IPC.install.retryFailed),
       list: () => call<InstallJobDto[]>(IPC.install.list),
+      clearHistory: () => call<number>(IPC.install.clearHistory),
       onChanged: async (listener) => on<InstallJobDto>(EVENTS.installChanged, listener),
     },
     mtp: {

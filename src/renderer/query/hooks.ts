@@ -266,6 +266,7 @@ export function useInstallMutations() {
       onSuccess: invalidate,
     }),
     retryFailed: useMutation({ mutationFn: () => getCatalogApi().install.retryFailed(), onSuccess: invalidate }),
+    clearHistory: useMutation({ mutationFn: () => getCatalogApi().install.clearHistory(), onSuccess: invalidate }),
   };
 }
 

@@ -16,7 +16,7 @@ import type {
 } from '@main/mtp/mtp.adapter';
 import { getBaseFile, upsertBaseGameFile } from '@main/repositories/game-files.repository';
 import { upsertGameByCleanedTitle } from '@main/repositories/games.repository';
-import { getInstallJob, insertInstallJob, listJobsByStatus, updateInstallJob } from '@main/repositories/install-jobs.repository';
+import { getInstallJob, insertInstallJob, latestCompletedInstall, listJobsByStatus, updateInstallJob } from '@main/repositories/install-jobs.repository';
 import { getUpdate, listAllUpdates, upsertUpdate } from '@main/repositories/updates.repository';
 import { recordInspection } from '@main/repositories/title-catalog.repository';
 import { detectVersion } from '@main/scanner/filename-parser';
@@ -170,6 +170,26 @@ function writeSource(name: string, sizeBytes: number): string {
 function seedGame(title: string): number {
   return upsertGameByCleanedTitle(db, { displayTitle: title, cleanedTitle: title });
 }
+
+describe('install history cleanup', () => {
+  it('deletes finished entries while retaining pending and running transfers', () => {
+    const gameId = seedGame('History game');
+    const ids = ['completed', 'failed', 'cancelled', 'pending', 'running'].map((status, index) => {
+      const id = insertInstallJob(db, { gameId, sourcePath: `C:/games/${index}.nsp`,
+        destinationFolder: 'shell:::sd', destinationLabel: 'SD install', destinationType: 'mtp-sd',
+        fileName: `${index}.nsp`, fileSize: 100, fileKind: 'base', detectedVersion: '', rawVersion: 0 });
+      if (status !== 'pending') updateInstallJob(db, id, { status: status as InstallJobDto['status'] });
+      return id;
+    });
+    expect(latestCompletedInstall(db, gameId)?.id).toBe(ids[0]);
+
+    const service = createService();
+    expect(service.clearHistory()).toBe(3);
+    expect(service.getJobs().map((job) => job.status).sort()).toEqual(['pending', 'running']);
+    expect(latestCompletedInstall(db, gameId)).toBeNull();
+    expect(service.clearHistory()).toBe(0);
+  });
+});
 
 function seedBase(gameId: number, name: string, sizeBytes: number): { id: number; path: string } {
   const path = writeSource(name, sizeBytes);

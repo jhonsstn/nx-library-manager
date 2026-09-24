@@ -10,6 +10,7 @@ export function registerInstallIpc(deps: IpcDeps): void {
   handle(IPC.install.cancel, z.tuple([z.number().int().positive()]), (jobId) => deps.install.cancel(jobId));
   handle(IPC.install.retryFailed, z.tuple([]), () => deps.install.retryFailed());
   handle(IPC.install.list, z.tuple([]), () => deps.install.getJobs());
+  handle(IPC.install.clearHistory, z.tuple([]), () => deps.install.clearHistory());
 }
 
 export function registerMtpIpc(deps: IpcDeps): void {

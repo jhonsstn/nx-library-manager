@@ -135,6 +135,7 @@ export interface SwitchCatalogApi {
     cancel(jobId: number): Promise<void>;
     retryFailed(): Promise<InstallJobDto[]>;
     list(): Promise<InstallJobDto[]>;
+    clearHistory(): Promise<number>;
     onChanged(listener: (event: InstallJobDto) => void): Promise<() => void>;
   };
 

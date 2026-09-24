@@ -83,6 +83,7 @@ function summary(overrides: Partial<GameSummaryDto> = {}): GameSummaryDto {
     baseFile: BASE_FILE,
     updateCount: 2,
     hasNewerUpdate: true,
+    hasCleanableUpdates: false,
     ...overrides,
   };
 }
@@ -164,6 +165,29 @@ describe('LibraryPage', () => {
       'RPG',
     ]);
     expect(listGames).toHaveBeenCalledWith([expect.objectContaining({ genre: undefined, search: undefined })]);
+  });
+
+  it('shows only actionable update dots and leaves current clean rows uncluttered', async () => {
+    renderLibrary({
+      [IPC.catalog.listGames]: () => ({ items: [
+        summary({ id: 1, displayTitle: 'Missing and cleanable', hasCleanableUpdates: true }),
+        summary({ id: 2, displayTitle: 'Current and clean', hasNewerUpdate: false,
+          hasCleanableUpdates: false, updateCount: 1 }),
+      ], total: 2 }),
+      [IPC.catalog.getGenres]: () => [],
+    });
+
+    const actionable = await screen.findByRole('option', { name: 'Missing and cleanable' });
+    expect(actionable).toHaveAccessibleDescription(
+      'Latest known update file is missing. Older tracked update files can be cleaned',
+    );
+    expect(within(actionable).getByTitle('Latest known update file is missing')).toBeInTheDocument();
+    expect(within(actionable).getByTitle('Older tracked update files can be cleaned')).toBeInTheDocument();
+    expect(within(actionable).queryByText('2 update files')).not.toBeInTheDocument();
+
+    const clean = screen.getByRole('option', { name: 'Current and clean' });
+    expect(clean).toHaveTextContent(/^Current and clean$/);
+    expect(clean).not.toHaveAccessibleDescription();
   });
 
   it('debounces the search box and refilters the rows', async () => {

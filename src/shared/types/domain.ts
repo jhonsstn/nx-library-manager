@@ -7,6 +7,7 @@ export type GameFileKind = 'base' | 'update' | 'dlc';
 export type ScanPhase = 'discovering' | 'classifying' | 'matching' | 'reconciling';
 
 export type UpdateStatusKind =
+  | 'loading'
   | 'unknown'
   | 'current'
   | 'update-available'
@@ -141,6 +142,7 @@ export interface GameSummaryDto {
   baseFile: GameFileDto | null;
   updateCount: number;
   hasNewerUpdate: boolean;
+  hasCleanableUpdates: boolean;
   titleId?: string | null;
 }
 

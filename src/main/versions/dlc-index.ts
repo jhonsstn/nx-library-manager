@@ -4,6 +4,8 @@ import { Worker } from 'node:worker_threads';
 
 export interface KnownDlc { titleId: string; baseTitleId: string; name: string | null }
 export interface DlcIndex { refreshedAt: string; entries: KnownDlc[]; patchIds: string[] }
+type DlcIndexData = Pick<DlcIndex, 'entries' | 'patchIds'>;
+export type DlcIndexAvailability = 'loading' | 'ready' | 'unavailable';
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const TITLE_ID = /^[0-9A-F]{16}$/;
 
@@ -52,8 +54,11 @@ export function extractPatchIds(cnmts: Record<string, unknown>): string[] {
 export class DlcIndexCache {
   private index: DlcIndex | null = null;
   private patches: ReadonlySet<string> | null = null;
+  private refreshState: DlcIndexAvailability = 'loading';
   private readonly file: string;
-  constructor(cacheDir: string) { this.file = join(cacheDir, 'dlc-index.json'); }
+  constructor(cacheDir: string, private readonly downloadIndex: () => Promise<DlcIndexData> = downloadDlcIndex) {
+    this.file = join(cacheDir, 'dlc-index.json');
+  }
 
   loadCached(): DlcIndex | null {
     if (!existsSync(this.file)) return null;
@@ -68,12 +73,14 @@ export class DlcIndexCache {
         return null;
       this.index = value;
       this.patches = new Set(value.patchIds);
+      this.refreshState = 'ready';
       return value;
     } catch { return null; }
   }
 
   get refreshedAt(): string | null { return this.index?.refreshedAt ?? null; }
   get patchIds(): ReadonlySet<string> | null { return this.patches; }
+  get availability(): DlcIndexAvailability { return this.patches ? 'ready' : this.refreshState; }
 
   forBase(baseTitleId: string): KnownDlc[] {
     return this.index?.entries.filter((entry) => entry.baseTitleId === baseTitleId) ?? [];
@@ -81,28 +88,39 @@ export class DlcIndexCache {
 
   async refresh(force = false): Promise<boolean> {
     if (!force && this.index && Date.now() - Date.parse(this.index.refreshedAt) < WEEK_MS) return false;
-    const data = await new Promise<{ entries: KnownDlc[]; patchIds: string[] }>((resolve, reject) => {
-      const worker = new Worker(join(__dirname, 'dlc-index.worker.js'));
-      let settled = false;
-      worker.once('message', (result: { entries?: KnownDlc[]; patchIds?: string[]; error?: string }) => {
-        settled = true;
-        void worker.terminate();
-        if (result.error || !result.entries || !result.patchIds) reject(new Error(result.error ?? 'DLC index unavailable'));
-        else resolve({ entries: result.entries, patchIds: result.patchIds });
-      });
-      worker.once('error', (error) => { if (!settled) { settled=true; reject(error); } });
-      worker.once('exit', (code) => { if (!settled) {
-        settled=true; reject(new Error(`DLC index worker exited ${code}`));
-      } });
-      worker.postMessage('refresh');
-    });
-    if (data.entries.length < 1000 || data.patchIds.length < 1000) throw new Error('TitleDB index failed validation');
-    const next = { refreshedAt: new Date().toISOString(), ...data };
-    const temp = `${this.file}.${process.pid}.tmp`;
-    writeFileSync(temp, JSON.stringify(next));
-    renameSync(temp, this.file);
-    this.index = next;
-    this.patches = new Set(next.patchIds);
-    return true;
+    if (!this.patches) this.refreshState = 'loading';
+    try {
+      const data = await this.downloadIndex();
+      if (data.entries.length < 1000 || data.patchIds.length < 1000) throw new Error('TitleDB index failed validation');
+      const next = { refreshedAt: new Date().toISOString(), ...data };
+      const temp = `${this.file}.${process.pid}.tmp`;
+      writeFileSync(temp, JSON.stringify(next));
+      renameSync(temp, this.file);
+      this.index = next;
+      this.patches = new Set(next.patchIds);
+      this.refreshState = 'ready';
+      return true;
+    } catch (error) {
+      if (!this.patches) this.refreshState = 'unavailable';
+      throw error;
+    }
   }
+}
+
+function downloadDlcIndex(): Promise<DlcIndexData> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(join(__dirname, 'dlc-index.worker.js'));
+    let settled = false;
+    worker.once('message', (result: { entries?: KnownDlc[]; patchIds?: string[]; error?: string }) => {
+      settled = true;
+      void worker.terminate();
+      if (result.error || !result.entries || !result.patchIds) reject(new Error(result.error ?? 'DLC index unavailable'));
+      else resolve({ entries: result.entries, patchIds: result.patchIds });
+    });
+    worker.once('error', (error) => { if (!settled) { settled=true; reject(error); } });
+    worker.once('exit', (code) => { if (!settled) {
+      settled=true; reject(new Error(`DLC index worker exited ${code}`));
+    } });
+    worker.postMessage('refresh');
+  });
 }

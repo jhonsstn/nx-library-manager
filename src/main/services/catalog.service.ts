@@ -105,7 +105,8 @@ export class CatalogService {
 
     const baseFile = getBaseFile(this.db, gameId);
     const updates = listUpdatesForGame(this.db, gameId);
-    const summary = this.toSummary(record, baseFile, updates);
+    const updateCleanup = previewOldUpdates(this.db, gameId);
+    const summary = this.toSummary(record, baseFile, updates, updateCleanup.deleteFiles.length > 0);
     const contents = contentsForGame(this.db, gameId);
     const titleId = verifiedBaseTitleId(contents);
     const localVersions = verifiedPatchVersions(contents,titleId);
@@ -156,7 +157,7 @@ export class CatalogService {
       updates: updates.map((update) => toUpdateDto(update)),
       screenshots,
       versionStatus: this.verifiedVersionStatus(titleId, contents),
-      updateCleanup: previewOldUpdates(this.db, gameId),
+      updateCleanup,
       containedTitles: contents,
       knownDlc,
       knownDlcRefreshedAt: this.versions.dlcIndex.refreshedAt,
@@ -255,7 +256,8 @@ export class CatalogService {
     if (!getGame(this.db, gameId)) throw appError('NOT_FOUND', `No game with id ${gameId}.`);
   }
 
-  private toSummary(record: GameRecord, baseFile: GameFileRecord | null, updates: UpdateRecord[]): GameSummaryDto {
+  private toSummary(record: GameRecord, baseFile: GameFileRecord | null, updates: UpdateRecord[],
+    hasCleanableUpdates = previewOldUpdates(this.db, record.id).deleteFiles.length > 0): GameSummaryDto {
     const contents = contentsForGame(this.db, record.id);
     const titleId = verifiedBaseTitleId(contents);
     const status = this.verifiedVersionStatus(titleId, contents);
@@ -280,6 +282,7 @@ export class CatalogService {
       baseFile: baseFile as GameFileDto | null,
       updateCount: updatePaths.size,
       hasNewerUpdate: Boolean(status.missingUpdate),
+      hasCleanableUpdates,
       titleId: titleId || null,
     };
   }
@@ -288,15 +291,17 @@ export class CatalogService {
     const patches = contents.filter((item) => item.type === 'update'
       && (!item.baseTitleId || item.baseTitleId === titleId));
     const base = contents.find((item) => item.type === 'base' && !item.provisional);
-    const uncertain = !this.versions.dlcIndex.patchIds
-      ? 'TitleDB title-type index is unavailable.'
-      : !titleId || !base || base.source !== 'cnmt'
+    const localMetadataIssue = !titleId || !base || base.source !== 'cnmt'
       ? 'Base title has not been verified from CNMT.'
       : patches.some((item) => item.provisional || item.rawVersion === null)
         ? 'A local patch version could not be verified.' : null;
+    const loadingIndex = !localMetadataIssue && !this.versions.dlcIndex.patchIds
+      && this.versions.dlcIndex.availability === 'loading';
+    const uncertain = localMetadataIssue ?? (!this.versions.dlcIndex.patchIds
+      ? 'TitleDB title-type index is unavailable.' : null);
     const localVersions = verifiedPatchVersions(contents,titleId);
     const status = this.versions.statusForTitleId(titleId, localVersions);
-    if (uncertain || !status.latest) return { ...status, kind: 'unknown' as const,
+    if (uncertain || !status.latest) return { ...status, kind: loadingIndex ? 'loading' as const : 'unknown' as const,
       newer: [], missingUpdate: null, uncertainty: uncertain ?? 'TitleDB has no release data.' };
     return { ...status, missingUpdate: status.newer[0] ?? null, uncertainty: null };
   }

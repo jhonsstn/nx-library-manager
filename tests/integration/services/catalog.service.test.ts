@@ -133,12 +133,31 @@ describe('CatalogService.listGames', () => {
       needsReview: false,
       updateCount: 1,
       hasNewerUpdate: false,
+      hasCleanableUpdates: false,
       genres: ['Action', 'Indie'],
       coverDisplayUrl: 'https://images.igdb.com/igdb/image/upload/t_cover_big/hades.jpg',
     });
     expect(hades.baseFile?.filePath).toBe('C:/games/Hades.nsp');
     // The combined package contains a verified base ID and patch version.
     expect(zelda.hasNewerUpdate).toBe(true);
+    expect(zelda.hasCleanableUpdates).toBe(false);
+  });
+
+  it('marks only verified tracked older patch files as cleanable', () => {
+    const oldPath = 'C:/updates/Zelda [v32768].nsp';
+    upsertUpdate(db, {
+      gameId: 2, filePath: oldPath, fileName: 'Zelda [v32768].nsp',
+      detectedVersion: '32768', fileSize: 1000, modifiedTime: 5000,
+      matchConfidence: 1,
+    });
+    recordInspection(db, {
+      path: oldPath, size: 1000, mtime: 5000, parserVersion: 1, keysRevision: 1, error: null,
+      titles: [{ titleId: '0100000000010800', baseTitleId: TITLE_ID, type: 'update',
+        rawVersion: 32768, name: null, publisher: null, source: 'cnmt' }],
+    });
+
+    expect(catalog.listGames().items.find((game) => game.displayTitle === 'Zelda'))
+      .toMatchObject({ hasNewerUpdate: true, hasCleanableUpdates: true });
   });
 
   it('filters by prefix search, genre, favorites, review flag and update state', () => {
@@ -186,6 +205,26 @@ describe('CatalogService.getGame', () => {
       .toMatchObject({ name:'Bonus content',filePresent:true });
     expect(details.knownDlc?.find((entry) => entry.titleId === '0100000000011001'))
       .toMatchObject({ name:'0100000000011001',nameSource:'title-id',filePresent:false });
+  });
+
+  it('shows a loading state while a verified game waits for the first TitleDB index', async () => {
+    const dir = mkdtempSync(join(TEMP_ROOT, 'pending-index-'));
+    const pendingPaths = resolveAppPaths(dir, dir);
+    ensureAppPaths(pendingPaths);
+    writeFileSync(pendingPaths.versionsJsonFile, JSON.stringify({
+      [TITLE_ID]: { '131072': '2021-01-01' },
+    }));
+    writeFileSync(pendingPaths.versionsTxtFile, 'id|name|version\n');
+    const pendingVersions = new VersionService({ db, paths: pendingPaths });
+    await pendingVersions.load();
+    const pendingCatalog = new CatalogService({
+      db, versions: pendingVersions, settings: () => defaultAppSettings(),
+    });
+
+    expect(pendingCatalog.getGame(2).versionStatus).toMatchObject({
+      kind: 'loading', missingUpdate: null,
+    });
+    expect(pendingCatalog.getGame(1).versionStatus.kind).toBe('unknown');
   });
 
   it('uses a matching local DLC filename when TitleDB has no name', () => {

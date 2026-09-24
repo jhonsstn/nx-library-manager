@@ -43,6 +43,7 @@ function game(id: number, displayTitle: string, overrides: Partial<GameSummaryDt
     baseFile: null,
     updateCount: 0,
     hasNewerUpdate: false,
+    hasCleanableUpdates: false,
     ...overrides,
   };
 }

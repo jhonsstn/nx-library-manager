@@ -258,9 +258,12 @@ function bootstrap(): void {
   );
   void versions.dlcIndex.refresh().then(
     (changed) => { if (changed) { versions.loadCached(); emit(EVENTS.versionsChanged, undefined); } },
-    (error: unknown) => logger.warn('dlcIndex.refreshFailed', {
-      error: error instanceof Error ? error.message : String(error),
-    }),
+    (error: unknown) => {
+      logger.warn('dlcIndex.refreshFailed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      emit(EVENTS.versionsChanged, undefined);
+    },
   );
   if (currentSettings.autoRescanOnStartup && currentSettings.baseGamesFolder) {
     void scanner.start(resolveScanInput(currentSettings, {})).catch((error: unknown) => {

@@ -142,6 +142,7 @@ export interface GameSummaryDto {
   baseFile: GameFileDto | null;
   updateCount: number;
   hasNewerUpdate: boolean;
+  hasCleanableUpdates: boolean;
   titleId?: string | null;
 }
 

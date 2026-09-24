@@ -43,22 +43,22 @@ export function previewOldUpdates(db: AppDatabase, gameId: number): UpdateCleanu
 
   const matchedPaths = new Set((db.prepare('SELECT file_path FROM updates WHERE game_id=?').all(gameId) as
     Array<{ file_path: string }>).map((row) => row.file_path));
-  const basePaths = new Set((db.prepare('SELECT file_path FROM game_files').all() as
-    Array<{ file_path: string }>).map((row) => row.file_path));
+  const findBasePath = db.prepare('SELECT 1 FROM game_files WHERE file_path=? LIMIT 1');
 
   let latestLocalVersion: number | null = null;
   const packages: Array<{ file: UpdateCleanupFileDto; removable: boolean }> = [];
   for (const [path, titles] of byPath) {
     const first = titles[0];
     if (first.inspection_version === null || first.inspection_error) continue;
-    if (!matchedPaths.has(path) && !basePaths.has(path)) continue;
+    const isBasePath = Boolean(findBasePath.get(path));
+    if (!matchedPaths.has(path) && !isBasePath) continue;
     const patches = titles.filter((title) => title.type === 'update' && !title.provisional &&
       title.detection_source !== 'filename' && title.detection_source !== 'migration' &&
       title.base_title_id === baseTitleId && title.title_id &&
       title.raw_version !== null && Number.isSafeInteger(title.raw_version) && title.raw_version > 0);
     if (patches.length === 0) continue;
     for (const patch of patches) latestLocalVersion = Math.max(latestLocalVersion ?? 0, patch.raw_version!);
-    const removable = matchedPaths.has(path) && !basePaths.has(path) &&
+    const removable = matchedPaths.has(path) && !isBasePath &&
       titles.length === 1 && patches.length === 1 &&
       titles.every((title) => !title.provisional && title.detection_source !== 'filename' &&
         title.detection_source !== 'migration');

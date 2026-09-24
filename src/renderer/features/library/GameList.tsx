@@ -18,7 +18,8 @@ const SKELETON_ROWS = 6;
  * Library list rows. Each row is a `role="option"` in a single-select listbox
  * whose accessible name is the game title, so the row is reachable by keyboard
  * and by name (spec 12 accessibility) instead of only through the pointer-only
- * context menu. Every status the Qt build conveyed with colour carries text too.
+ * context menu. Compact status dots expose their meaning on hover and through
+ * the row's accessible description.
  */
 export function GameList({
   games,
@@ -61,6 +62,11 @@ export function GameList({
     <div className="list library-list" role="listbox" aria-label="Games">
       {games.map((game) => {
         const selected = game.id === selectedGameId;
+        const updateStatuses = [
+          game.hasNewerUpdate ? 'Latest known update file is missing' : null,
+          game.hasCleanableUpdates ? 'Older tracked update files can be cleaned' : null,
+        ].filter((status): status is string => status !== null);
+        const statusDescriptionId = updateStatuses.length ? `game-update-status-${game.id}` : undefined;
         return (
           <button
             key={game.id}
@@ -68,6 +74,7 @@ export function GameList({
             role="option"
             aria-selected={selected}
             aria-label={game.displayTitle}
+            aria-describedby={statusDescriptionId}
             className={`list__item library-row${selected ? ' is-selected' : ''}${
               game.favorite ? ' is-favorite' : ''
             }`}
@@ -83,13 +90,18 @@ export function GameList({
                 </span>
               ) : null}
               {game.needsReview ? <span className="badge badge--review">Needs review</span> : null}
-              {game.hasNewerUpdate ? <span className="badge badge--update">Update available</span> : null}
-              {game.updateCount > 0 ? (
-                <span className="list__meta">
-                  {game.updateCount} update file{game.updateCount === 1 ? '' : 's'}
-                </span>
+              {game.hasNewerUpdate ? (
+                <span className="library-row__status library-row__status--missing"
+                  title="Latest known update file is missing" aria-hidden="true" />
+              ) : null}
+              {game.hasCleanableUpdates ? (
+                <span className="library-row__status library-row__status--cleanup"
+                  title="Older tracked update files can be cleaned" aria-hidden="true" />
               ) : null}
             </span>
+            {statusDescriptionId ? (
+              <span id={statusDescriptionId} className="sr-only">{updateStatuses.join('. ')}</span>
+            ) : null}
           </button>
         );
       })}

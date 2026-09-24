@@ -74,6 +74,7 @@ function baseHandlers(rows: InstallableUpdateDto[]): Record<string, FakeHandler>
           baseFile: null,
           updateCount: 0,
           hasNewerUpdate: false,
+          hasCleanableUpdates: false,
         },
       ],
       total: 1,

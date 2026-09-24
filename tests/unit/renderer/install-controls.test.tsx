@@ -71,6 +71,7 @@ const GAME: GameDetailsDto = {
   baseFile: BASE_FILE,
   updateCount: 3,
   hasNewerUpdate: false,
+  hasCleanableUpdates: false,
   description: '',
   developer: '',
   publisher: '',

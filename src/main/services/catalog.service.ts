@@ -105,7 +105,8 @@ export class CatalogService {
 
     const baseFile = getBaseFile(this.db, gameId);
     const updates = listUpdatesForGame(this.db, gameId);
-    const summary = this.toSummary(record, baseFile, updates);
+    const updateCleanup = previewOldUpdates(this.db, gameId);
+    const summary = this.toSummary(record, baseFile, updates, updateCleanup.deleteFiles.length > 0);
     const contents = contentsForGame(this.db, gameId);
     const titleId = verifiedBaseTitleId(contents);
     const localVersions = verifiedPatchVersions(contents,titleId);
@@ -156,7 +157,7 @@ export class CatalogService {
       updates: updates.map((update) => toUpdateDto(update)),
       screenshots,
       versionStatus: this.verifiedVersionStatus(titleId, contents),
-      updateCleanup: previewOldUpdates(this.db, gameId),
+      updateCleanup,
       containedTitles: contents,
       knownDlc,
       knownDlcRefreshedAt: this.versions.dlcIndex.refreshedAt,
@@ -255,7 +256,8 @@ export class CatalogService {
     if (!getGame(this.db, gameId)) throw appError('NOT_FOUND', `No game with id ${gameId}.`);
   }
 
-  private toSummary(record: GameRecord, baseFile: GameFileRecord | null, updates: UpdateRecord[]): GameSummaryDto {
+  private toSummary(record: GameRecord, baseFile: GameFileRecord | null, updates: UpdateRecord[],
+    hasCleanableUpdates = previewOldUpdates(this.db, record.id).deleteFiles.length > 0): GameSummaryDto {
     const contents = contentsForGame(this.db, record.id);
     const titleId = verifiedBaseTitleId(contents);
     const status = this.verifiedVersionStatus(titleId, contents);
@@ -280,6 +282,7 @@ export class CatalogService {
       baseFile: baseFile as GameFileDto | null,
       updateCount: updatePaths.size,
       hasNewerUpdate: Boolean(status.missingUpdate),
+      hasCleanableUpdates,
       titleId: titleId || null,
     };
   }

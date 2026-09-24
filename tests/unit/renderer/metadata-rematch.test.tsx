@@ -33,6 +33,7 @@ const GAME: GameDetailsDto = {
   baseFile: null,
   updateCount: 0,
   hasNewerUpdate: false,
+  hasCleanableUpdates: false,
   description: '',
   developer: '',
   publisher: '',

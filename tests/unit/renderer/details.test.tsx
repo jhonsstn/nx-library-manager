@@ -101,6 +101,7 @@ const SUMMARY: GameSummaryDto = {
   baseFile: BASE_FILE,
   updateCount: 2,
   hasNewerUpdate: true,
+  hasCleanableUpdates: false,
 };
 
 function details(overrides: Partial<GameDetailsDto> = {}): GameDetailsDto {

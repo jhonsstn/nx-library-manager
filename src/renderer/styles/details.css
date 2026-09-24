@@ -59,6 +59,31 @@
   gap: var(--space-1);
 }
 
+.library-row__status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.library-row__status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.library-row__status--missing {
+  color: var(--warning);
+}
+
+.library-row__status--cleanup {
+  color: var(--accent);
+}
+
 .library-skeletons {
   padding: var(--space-3);
   display: flex;

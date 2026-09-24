@@ -265,6 +265,22 @@ describe('GameDetailsPane', () => {
     expect(screen.getAllByText('Not installed')).toHaveLength(2);
   });
 
+  it('explains a stale DBI installed-games view after a recent app transfer', async () => {
+    renderPane({
+      [IPC.mtp.getInventory]: () => ({ state: 'ready', deviceId: 'switch-1', revision: 2,
+        checkedAt: '2026-09-24T12:00:00Z', unidentifiedFiles: 0, message: null, titles: [] }),
+      [IPC.catalog.getGame]: () => details({
+        switchStatus: { base: 'installed', update: 'installed', updateVersion: 65536,
+          localContentReady: true },
+        versionStatus: { kind: 'current', localVersion: 131072,
+          latest: { version: 131072, releaseDate: '2026-08-16' }, newer: [] },
+        installed: { source: 'install-history', rawVersion: 131072, destinationLabel: 'SD Card install',
+          destinationFolder: '::{switch}\\SD install', completedAt: '2026-09-24T12:00:00Z' },
+      }),
+    });
+    expect(await screen.findByText(/restart DBI MTP responder and Refresh/)).toBeVisible();
+  });
+
   it('groups the DLC and update files and installs the current selection', async () => {
     const user = userEvent.setup();
     renderPane({ [IPC.catalog.getGame]: () => details() });

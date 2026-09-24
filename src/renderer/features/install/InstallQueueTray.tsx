@@ -65,9 +65,12 @@ interface InstallJobRowProps {
 
 function InstallJobRow({ job, busy, onCancel, onRetry }: InstallJobRowProps) {
   // MTP transfers report no byte-level progress, so a numeric bar would be a lie.
-  const trackable = job.sizeBytes > 0 && (job.destinationType === 'folder' || job.transferredBytes > 0);
+  const trackable = job.sizeBytes > 0 && job.destinationType === 'folder';
   const percent = trackable ? Math.min(100, Math.round((job.transferredBytes / job.sizeBytes) * 100)) : null;
   const destination = job.destinationLabel || displayFolder(job.destinationFolder, job.destinationLabel ?? '');
+  const statusLabel = job.destinationType !== 'folder' && job.status === 'completed'
+    ? 'Copy step finished' : job.destinationType !== 'folder' && job.status === 'running'
+      ? 'Copying to Switch' : STATUS_LABELS[job.status];
 
   return (
     <li className="list__item list__item--static install-tray__row">
@@ -77,7 +80,7 @@ function InstallJobRow({ job, busy, onCancel, onRetry }: InstallJobRowProps) {
           <span className="list__meta">{job.destinationType === 'folder' ? 'Local folder' : destination}</span>
         </div>
         {percent === null ? (
-          <span className={job.status === 'failed' ? 'badge badge--review' : 'badge'}>{STATUS_LABELS[job.status]}</span>
+          <span className={job.status === 'failed' ? 'badge badge--review' : 'badge'}>{statusLabel}</span>
         ) : (
           <>
             <ProgressBar value={job.transferredBytes} max={job.sizeBytes} />
@@ -86,6 +89,9 @@ function InstallJobRow({ job, busy, onCancel, onRetry }: InstallJobRowProps) {
             </span>
           </>
         )}
+        {job.destinationType !== 'folder' && job.status === 'completed' ? <small className="dim">
+          Check “On this Switch” to confirm DBI finished installing it.
+        </small> : null}
         {job.error ? <p className="error-text">{job.error.message}</p> : null}
       </div>
       {job.status === 'pending' ? (

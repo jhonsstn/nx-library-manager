@@ -235,9 +235,20 @@ describe('InstallQueueTray', () => {
 
     expect(await screen.findByText('Install to SD.nsp')).toBeTruthy();
     const row = screen.getByText('Install to SD.nsp').closest('li') as HTMLElement;
-    expect(within(row).getByText('Running')).toBeTruthy();
+    expect(within(row).getByText('Copying to Switch')).toBeTruthy();
     expect(within(row).getByText('SD install')).toBeTruthy();
     expect(row.textContent).not.toContain('0%');
+  });
+
+  it('does not present a finished MTP copy step as 100% installed', async () => {
+    renderWithProviders(<InstallQueueTray />, { handlers: { [IPC.install.list]: () => [job({
+      id: 2, displayName: 'Small DLC.nsp', destinationType: 'mtp-sd',
+      status: 'completed', sizeBytes: 1024, transferredBytes: 1024,
+    })] } });
+    const row = (await screen.findByText('Small DLC.nsp')).closest('li') as HTMLElement;
+    expect(within(row).getByText('Copy step finished')).toBeTruthy();
+    expect(row.textContent).toContain('Check “On this Switch”');
+    expect(row.querySelector('[role="progressbar"]')).toBeNull();
   });
 
   it('cancels pending jobs and retries failed ones', async () => {

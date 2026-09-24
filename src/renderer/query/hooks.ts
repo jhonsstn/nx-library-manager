@@ -71,8 +71,9 @@ export function useHttpServerStatus() {
   });
 }
 
-export function useInstallJobs() {
-  return useQuery({ queryKey: queryKeys.installJobs(), queryFn: () => getCatalogApi().install.list() });
+export function useInstallJobs(refetchInterval?: number) {
+  return useQuery({ queryKey: queryKeys.installJobs(), queryFn: () => getCatalogApi().install.list(),
+    refetchInterval });
 }
 
 export function useAppVersion() {

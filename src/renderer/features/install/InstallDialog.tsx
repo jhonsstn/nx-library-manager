@@ -4,14 +4,14 @@ import type { CreateInstallInput, InstallDestination, InstallableUpdateDto } fro
 import { formatBytes } from '@shared/format/bytes';
 import { installSizeText } from '@shared/format/install';
 import { detectedVersionSuffix, rawVersionFromVersionText } from '@shared/format/versions';
-import type { GameDetailsDto, InstallDestinationType, MtpStatusDto } from '@shared/types/domain';
+import type { ContainedTitleDto, GameDetailsDto, InstallDestinationType, InstallJobDto, MtpInventoryDto, MtpStatusDto } from '@shared/types/domain';
 import { Button } from '@renderer/components/Button';
 import { ErrorText, Skeleton } from '@renderer/components/Feedback';
 import { Modal } from '@renderer/components/Modal';
-import { useToast } from '@renderer/components/Toast';
 import { useGame, useInstallMutations, useMtpInventory, useMtpStatus, useRefreshMtpInventory,
   useSettings, useUpdates } from '@renderer/query/hooks';
 import { getCatalogApi } from '@renderer/api';
+import { InstallBatchProgress } from './InstallBatchProgress';
 
 /** Destination choices shared by the install dialog and the inline install controls. */
 export const INSTALL_DESTINATION_OPTIONS: Array<{ value: InstallDestinationType; label: string }> = [
@@ -110,12 +110,14 @@ function freeSpaceWarning(destination: InstallDestination | null, mtp: MtpStatus
 }
 
 export function InstallDialog({ gameId, updateIds = [], destination, suggested = false, onClose }: InstallDialogProps) {
-  const toast = useToast();
   const settings = useSettings();
   const mtp = useMtpStatus();
   const game = useGame(gameId ?? null);
   const updates = useUpdates({});
   const { create } = useInstallMutations();
+  const [queuedBatch, setQueuedBatch] = useState<{
+    jobs: InstallJobDto[]; contents: ContainedTitleDto[]; before: MtpInventoryDto | null;
+  } | null>(null);
   const [kind, setKind] = useState<InstallDestinationType | null>(destination ? destinationKindOf(destination) : null);
 
   useEffect(() => {
@@ -177,11 +179,16 @@ export function InstallDialog({ gameId, updateIds = [], destination, suggested =
     }
     create.mutate(payload, {
       onSuccess: (jobs) => {
-        toast.success('Install queued', `${jobs.length} file(s) queued for transfer.`);
-        onClose();
+        if (jobs.length === 0) { onClose(); return; }
+        setQueuedBatch({ jobs, contents: game.data?.containedTitles ?? [], before: inventory.data ?? null });
       },
     });
   };
+
+  if (queuedBatch) return <Modal title="Install progress" onClose={onClose}>
+    <InstallBatchProgress jobs={queuedBatch.jobs} contents={queuedBatch.contents}
+      deviceId={queuedBatch.before?.deviceId ?? null} before={queuedBatch.before} onClose={onClose} />
+  </Modal>;
 
   return (
     <Modal

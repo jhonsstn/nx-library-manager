@@ -336,6 +336,11 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
                   {details.switchStatus?.localContentReady ? <Button variant="primary"
                     onClick={() => setSuggestedInstall(true)}>Install missing local content</Button> : null}
                   <small className="dim">DBI MTP · checked {inventory.data?.checkedAt ?? 'unknown time'}</small>
+                  {details.installed?.source === 'install-history'
+                    && typeof details.switchStatus?.updateVersion === 'number'
+                    && localVersion > details.switchStatus.updateVersion ? <small className="dim">
+                      If you just installed this update, restart DBI MTP responder and Refresh; its installed-games list may be cached.
+                    </small> : null}
                 </>}
           </section> : null}
           {details.baseFile ? (

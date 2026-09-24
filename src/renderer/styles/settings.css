@@ -125,6 +125,30 @@
   color: var(--text-muted);
 }
 
+.install-batch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.install-batch p {
+  margin: 0;
+}
+
+.install-batch__file {
+  overflow-wrap: anywhere;
+}
+
+.install-batch__confirmed {
+  color: var(--success);
+}
+
+.install-batch__footer {
+  margin-top: var(--space-2);
+  align-items: center;
+}
+
 .install-warning {
   color: var(--warning);
   font-size: var(--font-size-sm);

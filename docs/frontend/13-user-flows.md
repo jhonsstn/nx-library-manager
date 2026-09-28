@@ -21,7 +21,7 @@ Selected files enter a persistent queue. Same-volume moves use rename. Cross-vol
 
 ## MTP installation
 
-The user selects NAND or SD storage exposed by the Windows MTP adapter. Active MTP transfers cannot be cancelled because the platform handoff has no safe abort mechanism.
+The user selects NAND or SD storage exposed by the Windows MTP adapter. Selected files for one destination transfer in one Windows operation. When it finishes, the app reports transfer success without waiting for a new DBI inventory scan. Active MTP transfers cannot be cancelled because the platform handoff has no safe abort mechanism.
 
 ## Shutdown
 

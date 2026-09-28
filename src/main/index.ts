@@ -175,7 +175,6 @@ function bootstrap(): void {
     logger: logger.child('install'),
     onJobChanged: (job) => emit(EVENTS.installChanged, job),
     inventory: () => mtp.getInventory(),
-    onMtpBatchFinished: () => { void mtp.refreshInventory(); },
   });
   const files = new FileService({ db, logger: logger.child('files') });
   const metadata = new MetadataService({

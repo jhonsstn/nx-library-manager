@@ -47,9 +47,13 @@ export type MtpTransferState = (typeof MTP_TRANSFER_STATES)[number];
 
 export interface MtpCopyInput {
   sourcePath: string;
-  destination: MtpStorageDestination;
   fileName: string;
   totalBytes: number;
+}
+
+export interface MtpCopyBatchInput {
+  files: MtpCopyInput[];
+  destination: MtpStorageDestination;
   timeoutSeconds?: number;
   onStateChange?: (state: MtpTransferState) => void;
 }
@@ -64,7 +68,7 @@ export interface MtpAdapter {
   /** Enumerates the SD/NAND install destinations, never overlapping calls. */
   listInstallDestinations(options?: { timeoutSeconds?: number }): Promise<MtpStorageDestination[]>;
   getStatus(options?: { timeoutSeconds?: number }): Promise<MtpStatus>;
-  copyFile(input: MtpCopyInput, signal?: AbortSignal): Promise<void>;
+  copyFiles(input: MtpCopyBatchInput, signal?: AbortSignal): Promise<void>;
   /** Windows Shell folder picker (used for MTP install folder selection). */
   pickShellFolder(title: string): Promise<ShellFolderSelection | null>;
   listInstalledTitles(signal?: AbortSignal): Promise<MtpInstalledListing>;

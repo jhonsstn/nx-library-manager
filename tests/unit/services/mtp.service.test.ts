@@ -44,7 +44,7 @@ function fakeAdapter(status: MtpStatus): FakeAdapter {
       async listInstalledTitles() {
         return state.listing;
       },
-      async copyFile() {
+      async copyFiles() {
         /* not exercised here */
       },
       async pickShellFolder(title: string): Promise<ShellFolderSelection | null> {

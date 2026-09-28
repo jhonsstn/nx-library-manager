@@ -235,20 +235,19 @@ describe('InstallQueueTray', () => {
 
     expect(await screen.findByText('Install to SD.nsp')).toBeTruthy();
     const row = screen.getByText('Install to SD.nsp').closest('li') as HTMLElement;
-    expect(within(row).getByText('Copying to Switch')).toBeTruthy();
+    expect(within(row).getByText('Transferring to Switch')).toBeTruthy();
     expect(within(row).getByText('SD install')).toBeTruthy();
     expect(row.textContent).not.toContain('0%');
   });
 
-  it('does not present a finished MTP copy step as 100% installed', async () => {
+  it('reports a finished MTP transfer without claiming installed content', async () => {
     renderWithProviders(<InstallQueueTray />, { handlers: { [IPC.install.list]: () => [job({
       id: 2, displayName: 'Small DLC.nsp', destinationType: 'mtp-sd',
       status: 'completed', sizeBytes: 1024, transferredBytes: 1024,
     })] } });
     await userEvent.setup().click(await screen.findByText('Finished history (1)'));
     const row = (await screen.findByText('Small DLC.nsp')).closest('li') as HTMLElement;
-    expect(within(row).getByText('Copy step finished')).toBeTruthy();
-    expect(row.textContent).toContain('Check “On this Switch”');
+    expect(within(row).getByText('Transfer successful')).toBeTruthy();
     expect(row.querySelector('[role="progressbar"]')).toBeNull();
   });
 

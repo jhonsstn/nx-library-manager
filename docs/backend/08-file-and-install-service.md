@@ -74,7 +74,10 @@ Statuses:
 - failed;
 - cancelled.
 
-Only one transfer is active at a time.
+Only one transfer is active at a time. Consecutive MTP jobs targeting the same
+storage are submitted as one Windows file operation. Their queue rows become
+completed only when that operation finishes. If it fails, all rows in that
+batch are failed because individual outcomes may be unknown.
 
 ## Queue recovery
 
@@ -107,7 +110,7 @@ If storage data is unavailable, allow the user to proceed but report that free s
 ## Failure behavior
 
 On individual failure:
-- mark current job failed;
+- mark the current folder job or entire MTP batch failed;
 - stop subsequent queue items by default;
 - let user retry failed/pending portion;
 - do not delete source files unless the current installation workflow explicitly requires moving rather than copying.

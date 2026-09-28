@@ -98,16 +98,17 @@ describe('cleanPowerShellMessage', () => {
 });
 
 describe('readScript', () => {
-  it('reads the three programs from the repo scripts directory', () => {
+  it('reads the MTP programs from the repo scripts directory', () => {
     const list = readScript('mtp-list-storage.ps1', { scriptsDir: REPO_SCRIPTS });
     expect(list).toContain('Normalize-StorageName');
     expect(list.trimEnd().endsWith('$rows | ConvertTo-Json -Compress')).toBe(true);
 
-    const copy = readScript('mtp-copy-file.ps1', { scriptsDir: REPO_SCRIPTS });
+    const copy = readScript('mtp-copy-files.ps1', { scriptsDir: REPO_SCRIPTS });
     expect(copy).toContain('$env:SWITCH_CATALOG_MTP_DESTINATION');
-    expect(copy).toContain('$env:SWITCH_CATALOG_MTP_SOURCE');
-    expect(copy).toContain('$env:SWITCH_CATALOG_MTP_TIMEOUT');
-    expect(copy).toContain('Wait-ForShellFileOperation');
+    expect(copy).toContain('$env:SWITCH_CATALOG_MTP_SOURCES');
+    expect(copy).toContain('operation.CopyItem');
+    expect(copy).toContain('operation.PerformOperations');
+    expect(copy).toContain('operation.GetAnyOperationsAborted');
 
     const picker = readScript('mtp-pick-folder.ps1', { scriptsDir: REPO_SCRIPTS });
     expect(picker).toContain('$env:SWITCH_CATALOG_MTP_PICKER_TITLE');

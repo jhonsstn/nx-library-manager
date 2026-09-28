@@ -69,7 +69,7 @@ describe('Switch install review', () => {
     await screen.findByText('Update.nsp');
     await user.click(screen.getByRole('button', { name: 'Confirm install' }));
     expect(await screen.findByRole('dialog', { name: 'Install progress' })).toBeInTheDocument();
-    expect(screen.getByText('Preparing file 1 of 1')).toBeInTheDocument();
+    expect(screen.getByText('Transferring 1 file to Switch')).toBeInTheDocument();
     expect(screen.getByText(/Keep the Switch connected/)).toBeInTheDocument();
   });
 });

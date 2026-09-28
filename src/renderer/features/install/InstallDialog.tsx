@@ -4,7 +4,7 @@ import type { CreateInstallInput, InstallDestination, InstallableUpdateDto } fro
 import { formatBytes } from '@shared/format/bytes';
 import { installSizeText } from '@shared/format/install';
 import { detectedVersionSuffix, rawVersionFromVersionText } from '@shared/format/versions';
-import type { ContainedTitleDto, GameDetailsDto, InstallDestinationType, InstallJobDto, MtpInventoryDto, MtpStatusDto } from '@shared/types/domain';
+import type { GameDetailsDto, InstallDestinationType, InstallJobDto, MtpStatusDto } from '@shared/types/domain';
 import { Button } from '@renderer/components/Button';
 import { ErrorText, Skeleton } from '@renderer/components/Feedback';
 import { Modal } from '@renderer/components/Modal';
@@ -115,9 +115,7 @@ export function InstallDialog({ gameId, updateIds = [], destination, suggested =
   const game = useGame(gameId ?? null);
   const updates = useUpdates({});
   const { create } = useInstallMutations();
-  const [queuedBatch, setQueuedBatch] = useState<{
-    jobs: InstallJobDto[]; contents: ContainedTitleDto[]; before: MtpInventoryDto | null;
-  } | null>(null);
+  const [queuedBatch, setQueuedBatch] = useState<InstallJobDto[] | null>(null);
   const [kind, setKind] = useState<InstallDestinationType | null>(destination ? destinationKindOf(destination) : null);
 
   useEffect(() => {
@@ -180,14 +178,13 @@ export function InstallDialog({ gameId, updateIds = [], destination, suggested =
     create.mutate(payload, {
       onSuccess: (jobs) => {
         if (jobs.length === 0) { onClose(); return; }
-        setQueuedBatch({ jobs, contents: game.data?.containedTitles ?? [], before: inventory.data ?? null });
+        setQueuedBatch(jobs);
       },
     });
   };
 
   if (queuedBatch) return <Modal title="Install progress" onClose={onClose}>
-    <InstallBatchProgress jobs={queuedBatch.jobs} contents={queuedBatch.contents}
-      deviceId={queuedBatch.before?.deviceId ?? null} before={queuedBatch.before} onClose={onClose} />
+    <InstallBatchProgress jobs={queuedBatch} onClose={onClose} />
   </Modal>;
 
   return (

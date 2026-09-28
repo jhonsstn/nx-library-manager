@@ -1,11 +1,36 @@
-import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import { PowerShellMtpAdapter } from '@main/mtp/powershell-mtp.adapter';
 import type { PowerShellRunOptions } from '@main/mtp/powershell-runner';
 
 const scriptsDir = resolve(process.cwd(), 'resources', 'scripts');
 
 describe('PowerShell MTP inventory adapter', () => {
+  it('sends all selected files through one PowerShell copy operation', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'mtp-batch-'));
+    try {
+      const paths = [join(folder, 'base', 'Base.nsp'), join(folder, 'updates', 'Update.nsp')];
+      for (const path of paths) mkdirSync(dirname(path), { recursive: true });
+      for (const path of paths) writeFileSync(path, 'file');
+      const run = vi.fn(async (_options: PowerShellRunOptions) => ({ code: 0, stderr: '', stdout: '' }));
+      const adapter = new PowerShellMtpAdapter({ scriptsDir, run });
+      const states: string[] = [];
+      await adapter.copyFiles({ files: paths.map((sourcePath) => ({ sourcePath,
+        fileName: sourcePath, totalBytes: 4 })), destination: {
+        id: 'sd', name: 'SD install', label: 'SD install', shellPath: 'shell:::sd',
+        freeBytes: 100, totalBytes: 200,
+      }, timeoutSeconds: 60, onStateChange: (state) => states.push(state) });
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(run.mock.calls[0]?.[0].timeoutMs).toBe(60_000);
+      expect(JSON.parse(run.mock.calls[0]?.[0].env?.SWITCH_CATALOG_MTP_SOURCES ?? '')).toEqual(paths);
+      expect(states).toEqual(['preparing', 'copying', 'completed']);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
   it('parses a bounded, read-only installed-games listing', async () => {
     const received: PowerShellRunOptions[] = [];
     const adapter = new PowerShellMtpAdapter({ scriptsDir, run: async (options) => {

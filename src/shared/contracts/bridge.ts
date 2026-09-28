@@ -109,6 +109,7 @@ export function createSwitchCatalogApi(bridge: IpcBridge): SwitchCatalogApi {
     },
     files: {
       chooseDirectory: (input) => call<string | null>(IPC.files.chooseDirectory, [input]),
+      openBaseGameFolder: (gameId) => call<void>(IPC.files.openBaseGameFolder, [gameId]),
       deleteFile: (input) => call<DeleteFileResultDto>(IPC.files.deleteFile, [input]),
       cleanOldUpdates: (gameId, preview) => call<UpdateCleanupResultDto>(IPC.files.cleanOldUpdates, [gameId, preview]),
       moveFile: (input) => call<FileOperationResultDto>(IPC.files.moveFile, [input]),

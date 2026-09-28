@@ -124,6 +124,7 @@ export interface SwitchCatalogApi {
 
   files: {
     chooseDirectory(input?: ChooseDirectoryInput): Promise<string | null>;
+    openBaseGameFolder(gameId: number): Promise<void>;
     deleteFile(input: DeleteFileInput): Promise<DeleteFileResultDto>;
     cleanOldUpdates(gameId: number, preview: UpdateCleanupPreviewDto): Promise<UpdateCleanupResultDto>;
     moveFile(input: MoveFileInput): Promise<FileOperationResultDto>;

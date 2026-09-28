@@ -14,6 +14,7 @@ import { ConfirmDialog } from '@renderer/components/Modal';
 import { useContextMenu } from '@renderer/components/ContextMenu';
 import { Button } from '@renderer/components/Button';
 import { useToast } from '@renderer/components/Toast';
+import { getCatalogApi } from '@renderer/api';
 import { InstallControls } from '@renderer/features/install/InstallControls';
 import { InstallDialog } from '@renderer/features/install/InstallDialog';
 import {
@@ -99,6 +100,7 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
   const [cleanupPreview, setCleanupPreview] = useState<UpdateCleanupPreviewDto | null>(null);
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [screenshotIndex, setScreenshotIndex] = useState<number | null>(null);
+  const [openingBaseFolder, setOpeningBaseFolder] = useState(false);
 
   useEffect(() => {
     setSelectedUpdateIds([]);
@@ -209,6 +211,17 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
       },
       onError: (error) => toast.error('Could not change game visibility', errorMessage(error)),
     });
+  };
+
+  const openBaseFolder = async () => {
+    setOpeningBaseFolder(true);
+    try {
+      await getCatalogApi().files.openBaseGameFolder(details.id);
+    } catch (error) {
+      toast.error('Could not open the base game folder', errorMessage(error));
+    } finally {
+      setOpeningBaseFolder(false);
+    }
   };
 
   const openUpdatesMenu = (event: MouseEvent<HTMLElement>, updateId: number) => {
@@ -350,6 +363,9 @@ export function GameDetailsPane({ gameId, onVisibilityChange }: GameDetailsPaneP
           ) : <p className="details__file-summary">No base game file recorded.</p>}
           {details.installed ? <p className="details__installed">{formatInstalledStatus(details.installed)}</p> : null}
           <div className="row row--wrap details__actions">
+            {details.baseFile ? <Button onClick={() => void openBaseFolder()} disabled={openingBaseFolder}>
+              Open base game folder
+            </Button> : null}
             <Button onClick={toggleFavorite}>{details.favorite ? 'Remove favorite' : 'Favorite game'}</Button>
             <Button onClick={toggleNeedsReview}>
               {details.needsReview ? 'Clear needs review' : 'Mark as needs review'}

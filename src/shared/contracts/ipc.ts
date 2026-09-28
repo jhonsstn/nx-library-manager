@@ -29,6 +29,7 @@ export const IPC = {
   },
   files: {
     chooseDirectory: 'files:chooseDirectory',
+    openBaseGameFolder: 'files:openBaseGameFolder',
     deleteFile: 'files:deleteFile',
     cleanOldUpdates: 'files:cleanOldUpdates',
     moveFile: 'files:moveFile',

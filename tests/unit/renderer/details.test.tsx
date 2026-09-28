@@ -132,6 +132,23 @@ function renderPane(handlers: Record<string, (args: unknown[]) => unknown>) {
 }
 
 describe('GameDetailsPane', () => {
+  it('opens the recorded base game folder from the game page', async () => {
+    const openBaseGameFolder = vi.fn(() => undefined);
+    renderPane({
+      [IPC.catalog.getGame]: () => details(),
+      [IPC.files.openBaseGameFolder]: openBaseGameFolder,
+    });
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Open base game folder' }));
+    await waitFor(() => expect(openBaseGameFolder).toHaveBeenCalledWith([1]));
+  });
+
+  it('hides the folder button when no base game file is recorded', async () => {
+    renderPane({ [IPC.catalog.getGame]: () => details({ baseFile: null, files: [] }) });
+    expect(await screen.findByText('No base game file recorded.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open base game folder' })).not.toBeInTheDocument();
+  });
+
   it('reviews older tracked patches before cleaning them', async () => {
     const user = userEvent.setup();
     const cleanOldUpdates = vi.fn(() => ({ deletedFiles: 1, freedBytes: 100 }));

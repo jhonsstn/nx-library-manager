@@ -105,7 +105,8 @@ describe('readScript', () => {
 
     const copy = readScript('mtp-copy-files.ps1', { scriptsDir: REPO_SCRIPTS });
     expect(copy).toContain('$env:SWITCH_CATALOG_MTP_DESTINATION');
-    expect(copy).toContain('$env:SWITCH_CATALOG_MTP_SOURCES');
+    expect(copy).toContain('$env:SWITCH_CATALOG_MTP_SOURCE_COUNT');
+    expect(copy).toContain('GetEnvironmentVariable("SWITCH_CATALOG_MTP_SOURCE_$index")');
     expect(copy).toContain('operation.CopyItem');
     expect(copy).toContain('operation.PerformOperations');
     expect(copy).toContain('operation.GetAnyOperationsAborted');

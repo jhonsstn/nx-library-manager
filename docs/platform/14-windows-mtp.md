@@ -31,7 +31,7 @@ powershell.exe
 -EncodedCommand <controlled script>
 ```
 
-File paths are passed as JSON through the child environment rather than interpolated into shell source.
+Each file path is passed in a separate child environment variable rather than interpolated into shell source.
 
 ## Device detection
 

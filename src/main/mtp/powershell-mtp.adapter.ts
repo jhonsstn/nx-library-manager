@@ -153,7 +153,9 @@ export class PowerShellMtpAdapter implements MtpAdapter {
         timeoutMs: Math.round(timeoutSeconds * 1000),
         env: {
           SWITCH_CATALOG_MTP_DESTINATION: input.destination.shellPath,
-          SWITCH_CATALOG_MTP_SOURCES: JSON.stringify(input.files.map((file) => file.sourcePath)),
+          SWITCH_CATALOG_MTP_SOURCE_COUNT: String(input.files.length),
+          ...Object.fromEntries(input.files.map((file, index) =>
+            [`SWITCH_CATALOG_MTP_SOURCE_${index}`, file.sourcePath])),
         },
       });
     } catch (error) {
@@ -168,7 +170,7 @@ export class PowerShellMtpAdapter implements MtpAdapter {
       throw copyFailure(error, timeoutSeconds);
     }
     if (result.code !== 0) {
-      throw appError('MTP_COPY_FAILED', `MTP batch transfer failed: ${scriptMessage(result)}`);
+      throw appError('MTP_COPY_FAILED', `MTP batch transfer failed: ${scriptMessage(result)}`, { retryable: true });
     }
     input.onStateChange?.('completed');
   }
@@ -239,7 +241,7 @@ function copyFailure(error: unknown, timeoutSeconds: number): SwitchCatalogError
     );
   }
   const message = error instanceof Error ? error.message : String(error);
-  return appError('MTP_COPY_FAILED', `MTP batch transfer failed: ${message}`);
+  return appError('MTP_COPY_FAILED', `MTP batch transfer failed: ${message}`, { retryable: true });
 }
 
 /** Python reported either stream's cleaned message, with a code fallback. */

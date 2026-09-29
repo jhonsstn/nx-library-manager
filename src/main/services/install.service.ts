@@ -651,7 +651,8 @@ export class InstallService {
         onStateChange,
       });
     } catch (error) {
-      throw appError('MTP_COPY_FAILED', `MTP batch transfer failed; some files may have copied: ${describeError(error)}`, {
+      if (error instanceof SwitchCatalogError) throw error;
+      throw appError('MTP_COPY_FAILED', `MTP batch transfer failed: ${describeError(error)}`, {
         retryable: true,
         cause: error,
       });

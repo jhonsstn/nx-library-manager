@@ -1,9 +1,18 @@
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+trap { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
 $destPath = $env:SWITCH_CATALOG_MTP_DESTINATION
-$sourcePaths = @($env:SWITCH_CATALOG_MTP_SOURCES | ConvertFrom-Json)
-if ($sourcePaths.Count -eq 0) {
+$sourceCount = [int]$env:SWITCH_CATALOG_MTP_SOURCE_COUNT
+if ($sourceCount -le 0) {
     throw 'No source files were supplied for the MTP transfer.'
+}
+$sourcePaths = @()
+for ($index = 0; $index -lt $sourceCount; $index++) {
+    $sourcePath = [Environment]::GetEnvironmentVariable("SWITCH_CATALOG_MTP_SOURCE_$index")
+    if ([string]::IsNullOrEmpty($sourcePath)) {
+        throw "MTP source path $index is missing."
+    }
+    $sourcePaths += $sourcePath
 }
 
 # Validate the whole batch before asking Windows to copy anything. A batch is

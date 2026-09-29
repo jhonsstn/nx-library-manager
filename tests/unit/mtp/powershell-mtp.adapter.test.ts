@@ -1,9 +1,10 @@
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { PowerShellMtpAdapter } from '@main/mtp/powershell-mtp.adapter';
-import type { PowerShellRunOptions } from '@main/mtp/powershell-runner';
+import { encodeCommand, readScript, type PowerShellRunOptions } from '@main/mtp/powershell-runner';
 
 const scriptsDir = resolve(process.cwd(), 'resources', 'scripts');
 
@@ -24,11 +25,29 @@ describe('PowerShell MTP inventory adapter', () => {
       }, timeoutSeconds: 60, onStateChange: (state) => states.push(state) });
       expect(run).toHaveBeenCalledTimes(1);
       expect(run.mock.calls[0]?.[0].timeoutMs).toBe(60_000);
-      expect(JSON.parse(run.mock.calls[0]?.[0].env?.SWITCH_CATALOG_MTP_SOURCES ?? '')).toEqual(paths);
+      expect(run.mock.calls[0]?.[0].env).toMatchObject({
+        SWITCH_CATALOG_MTP_SOURCE_COUNT: '2',
+        SWITCH_CATALOG_MTP_SOURCE_0: paths[0],
+        SWITCH_CATALOG_MTP_SOURCE_1: paths[1],
+      });
       expect(states).toEqual(['preparing', 'copying', 'completed']);
     } finally {
       rmSync(folder, { recursive: true, force: true });
     }
+  });
+
+  it.skipIf(process.platform !== 'win32')('keeps seven paths separate in Windows PowerShell', () => {
+    const paths = Array.from({ length: 7 }, (_, index) =>
+      `D:\\Games Download\\Dead Cells [NSP]\\Dead Cells DLC ${index} [v0].nsp`);
+    const copyScript = readScript('mtp-copy-files.ps1', { scriptsDir });
+    const preamble = copyScript.split('# Validate the whole batch')[0];
+    const script = `${preamble}\nWrite-Output (ConvertTo-Json -InputObject $sourcePaths -Compress)`;
+    const env = { ...process.env, SWITCH_CATALOG_MTP_SOURCE_COUNT: String(paths.length),
+      ...Object.fromEntries(paths.map((path, index) => [`SWITCH_CATALOG_MTP_SOURCE_${index}`, path])) };
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-EncodedCommand', encodeCommand(script)],
+      { env, encoding: 'utf8' });
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout.trim())).toEqual(paths);
   });
 
   it('parses a bounded, read-only installed-games listing', async () => {

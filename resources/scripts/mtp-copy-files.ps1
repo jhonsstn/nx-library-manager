@@ -14,6 +14,7 @@ for ($index = 0; $index -lt $sourceCount; $index++) {
     }
     $sourcePaths += $sourcePath
 }
+$timeoutSeconds = [int]$env:SWITCH_CATALOG_MTP_TIMEOUT
 
 # Validate the whole batch before asking Windows to copy anything. A batch is
 # one Shell operation even when its source files live in different folders.
@@ -109,13 +110,18 @@ public static class MtpBatchCopy {
     public static void Copy(string destinationPath, string[] sources) {
         IMtpFileOperation operation = null;
         IMtpShellItem destination = null;
+        string stage = "resolve destination";
+        bool started = false;
         try {
             destination = Parse(destinationPath);
+            stage = "create file operation";
             operation = (IMtpFileOperation)Activator.CreateInstance(
                 Type.GetTypeFromCLSID(new Guid("3ad05575-8857-4850-9277-11b85bdb8e09")));
             // No confirmation or error dialogs; stop the batch on the first error.
+            stage = "set operation flags";
             operation.SetOperationFlags(0x00100410);
             foreach (string sourcePath in sources) {
+                stage = "queue " + sourcePath;
                 IMtpShellItem source = Parse(sourcePath);
                 try {
                     operation.CopyItem(source, destination, null, IntPtr.Zero);
@@ -123,10 +129,16 @@ public static class MtpBatchCopy {
                     Marshal.ReleaseComObject(source);
                 }
             }
+            stage = "perform operations";
+            started = true;
             operation.PerformOperations();
+            stage = "check operation result";
             bool aborted;
             operation.GetAnyOperationsAborted(out aborted);
             if (aborted) throw new InvalidOperationException("Windows stopped the MTP batch transfer before it finished.");
+        } catch (Exception error) {
+            throw new InvalidOperationException((started ? "MTP_TRANSFER_FAILED" : "MTP_PRETRANSFER_FAILED")
+                + " at " + stage + ": " + error.Message, error);
         } finally {
             if (operation != null) Marshal.ReleaseComObject(operation);
             if (destination != null) Marshal.ReleaseComObject(destination);
@@ -135,4 +147,84 @@ public static class MtpBatchCopy {
 }
 "@
 
-[MtpBatchCopy]::Copy($destPath, [string[]]$sourcePaths)
+try {
+    [MtpBatchCopy]::Copy($destPath, [string[]]$sourcePaths)
+    Write-Output 'MTP_METHOD: IFileOperation'
+} catch {
+    $cause = $_.Exception
+    while ($null -ne $cause -and -not $cause.Message.StartsWith('MTP_PRETRANSFER_FAILED')) {
+        $cause = $cause.InnerException
+    }
+    if ($null -eq $cause) { throw }
+    # DBI's virtual install folder can reject IFileOperation before any copy starts.
+    # The Shell.Application path was used by the earlier working transfer flow.
+    Write-Output "MTP_FALLBACK: $($cause.Message)"
+
+    Add-Type @"
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class SwitchCatalogWindowProbe {
+    public delegate bool EnumWindowsProc(IntPtr window, IntPtr data);
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr data);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetClassName(IntPtr window, StringBuilder text, int count);
+    public static string[] VisibleWindows() {
+        List<string> rows = new List<string>();
+        EnumWindows(delegate(IntPtr window, IntPtr data) {
+            if (!IsWindowVisible(window)) return true;
+            StringBuilder title = new StringBuilder(512);
+            StringBuilder name = new StringBuilder(256);
+            GetWindowText(window, title, title.Capacity);
+            GetClassName(window, name, name.Capacity);
+            rows.Add(name.ToString() + "\t" + title.ToString());
+            return true;
+        }, IntPtr.Zero);
+        return rows.ToArray();
+    }
+}
+"@
+    function Get-FileOperationWindowCount {
+        return @([SwitchCatalogWindowProbe]::VisibleWindows() | Where-Object {
+            $_ -match '^OperationStatusWindow\t' -or
+            $_ -match '(?i)\b(copying|moving|calculating|replacing)\b'
+        }).Count
+    }
+    function Wait-ForShellFileOperation([int]$seconds) {
+        $seenWindow = $false
+        $startDeadline = (Get-Date).AddSeconds(20)
+        do {
+            if ((Get-FileOperationWindowCount) -gt 0) {
+                $seenWindow = $true
+                break
+            }
+            Start-Sleep -Milliseconds 500
+        } while ((Get-Date) -lt $startDeadline)
+        if (-not $seenWindow) {
+            throw 'Windows did not show a transfer operation, so completion could not be confirmed.'
+        }
+        $deadline = (Get-Date).AddSeconds($seconds)
+        do {
+            Start-Sleep -Seconds 1
+            if ((Get-FileOperationWindowCount) -eq 0) {
+                Start-Sleep -Seconds 2
+                return
+            }
+        } while ((Get-Date) -lt $deadline)
+        throw "Windows file transfer window did not close before the $seconds second timeout."
+    }
+    foreach ($sourcePath in $sourcePaths) {
+        Write-Output "MTP_COPYING: $sourcePath"
+        try {
+            $dest.CopyHere($sourcePath, 16)
+            Wait-ForShellFileOperation $timeoutSeconds
+        } catch {
+            throw "Shell transfer failed for '$sourcePath': $($_.Exception.Message)"
+        }
+    }
+    Write-Output 'MTP_METHOD: Shell.CopyHere'
+}

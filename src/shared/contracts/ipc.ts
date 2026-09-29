@@ -64,6 +64,7 @@ export const IPC = {
     getPlatform: 'app:getPlatform',
     checkForUpdates: 'app:checkForUpdates',
     openExternal: 'app:openExternal',
+    openLogsFolder: 'app:openLogsFolder',
   },
 } as const;
 

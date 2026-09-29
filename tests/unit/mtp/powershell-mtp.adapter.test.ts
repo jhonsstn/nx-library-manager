@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -36,6 +36,28 @@ describe('PowerShell MTP inventory adapter', () => {
     }
   });
 
+  it('retains PowerShell stage output when a transfer fails', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'mtp-failure-'));
+    const sourcePath = join(folder, 'Base.nsp');
+    try {
+      writeFileSync(sourcePath, 'file');
+      const adapter = new PowerShellMtpAdapter({ scriptsDir, run: async () => ({
+        code: 1, stdout: 'MTP_FALLBACK: MTP_PRETRANSFER_FAILED at resolve destination\n',
+        stderr: 'Shell transfer failed for Base.nsp: device disconnected',
+      }) });
+      await expect(adapter.copyFiles({ files: [{ sourcePath, fileName: 'Base.nsp', totalBytes: 4 }],
+        destination: { id: 'sd', name: 'SD install', label: 'SD install', shellPath: 'shell:::sd',
+          freeBytes: 100, totalBytes: 200 } })).rejects.toMatchObject({
+        code: 'MTP_COPY_FAILED', details: {
+          exitCode: 1, stdout: expect.stringContaining('MTP_PRETRANSFER_FAILED'),
+          stderr: expect.stringContaining('device disconnected'),
+        },
+      });
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
   it.skipIf(process.platform !== 'win32')('keeps seven paths separate in Windows PowerShell', () => {
     const paths = Array.from({ length: 7 }, (_, index) =>
       `D:\\Games Download\\Dead Cells [NSP]\\Dead Cells DLC ${index} [v0].nsp`);
@@ -48,6 +70,29 @@ describe('PowerShell MTP inventory adapter', () => {
       { env, encoding: 'utf8' });
     expect(result.status).toBe(0);
     expect(JSON.parse(result.stdout.trim())).toEqual(paths);
+  });
+
+  it.skipIf(process.platform !== 'win32')('runs the batch script against a Windows folder', () => {
+    const folder = mkdtempSync(join(tmpdir(), 'mtp-script-'));
+    try {
+      const destination = join(folder, 'destination');
+      const sources = [join(folder, 'base', 'Base.nsp'), join(folder, 'dlc', 'DLC.nsp')];
+      mkdirSync(destination);
+      for (const source of sources) {
+        mkdirSync(dirname(source));
+        writeFileSync(source, 'content');
+      }
+      const env = { ...process.env, SWITCH_CATALOG_MTP_DESTINATION: destination,
+        SWITCH_CATALOG_MTP_TIMEOUT: '30', SWITCH_CATALOG_MTP_SOURCE_COUNT: String(sources.length),
+        ...Object.fromEntries(sources.map((source, index) => [`SWITCH_CATALOG_MTP_SOURCE_${index}`, source])) };
+      const result = spawnSync('powershell.exe', ['-NoProfile', '-STA', '-EncodedCommand',
+        encodeCommand(readScript('mtp-copy-files.ps1', { scriptsDir }))],
+      { env, encoding: 'utf8', timeout: 60_000 });
+      expect(result.status, result.stderr).toBe(0);
+      for (const source of sources) expect(existsSync(join(destination, source.split('\\').at(-1)!))).toBe(true);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
   });
 
   it('parses a bounded, read-only installed-games listing', async () => {

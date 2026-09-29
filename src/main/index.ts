@@ -146,7 +146,8 @@ function bootstrap(): void {
 
   const versions = new VersionService({ db, paths, logger: logger.child('versions') });
   versions.loadCached();
-  const mtpAdapter = new PowerShellMtpAdapter({ scriptsDir: resolveScriptsDir() });
+  const mtpAdapter = new PowerShellMtpAdapter({ scriptsDir: resolveScriptsDir(),
+    logger: logger.child('mtpTransfer') });
   const mtp = new MtpService({
     adapter: mtpAdapter,
     logger: logger.child('mtp'),

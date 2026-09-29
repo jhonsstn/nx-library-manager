@@ -715,6 +715,7 @@ export class InstallService {
       fileName: job.displayName,
       code: error.code,
       message: error.message,
+      details: error.details,
     });
   }
 

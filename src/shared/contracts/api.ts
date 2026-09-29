@@ -168,6 +168,7 @@ export interface SwitchCatalogApi {
     getPlatform(): Promise<string>;
     checkForUpdates(): Promise<AppUpdateStatusDto>;
     openExternal(url: string): Promise<void>;
+    openLogsFolder(): Promise<void>;
     onVersionsChanged(listener: () => void): Promise<() => void>;
     onShutdownStatus(listener: (event: ShutdownStatusDto) => void): Promise<() => void>;
   };

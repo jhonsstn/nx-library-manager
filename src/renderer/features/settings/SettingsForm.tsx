@@ -363,6 +363,10 @@ export function SettingsForm() {
           <Button onClick={() => void checkForUpdates()} disabled={checking}>
             Check for Updates
           </Button>
+          <Button onClick={() => void getCatalogApi().app.openLogsFolder()
+            .catch((error) => toast.error('Could not open logs folder', messageOf(error)))}>
+            Open logs folder
+          </Button>
           <CheckboxField
             label="Check for updates on startup"
             checked={draft.autoCheckUpdatesOnStartup}

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { screen, fireEvent } from '@testing-library/react';
 import { InstallBatchProgress } from '@renderer/features/install/InstallBatchProgress';
 import { IPC } from '@shared/contracts/ipc';
 import type { InstallJobDto } from '@shared/types/domain';
@@ -30,5 +30,19 @@ describe('InstallBatchProgress', () => {
     } });
     expect(await screen.findByText('Transfer successful')).toBeInTheDocument();
     expect(screen.getByText('All selected files finished transferring to the Switch.')).toBeInTheDocument();
+  });
+
+  it('shows and copies the transfer failure report', async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const failed = { ...job, status: 'failed' as const, error: { code: 'MTP_COPY_FAILED' as const,
+      message: 'Value does not fall within the expected range',
+      details: { stdout: 'MTP_PRETRANSFER_FAILED at resolve destination' } } };
+    renderWithProviders(<InstallBatchProgress jobs={[failed]} onClose={() => undefined} />,
+      { handlers: { [IPC.install.list]: () => [failed] } });
+    expect(await screen.findByText('Transfer stopped')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy error log' }));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('MTP_PRETRANSFER_FAILED'));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('C:/games/Pack.nsp'));
   });
 });

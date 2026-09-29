@@ -3,6 +3,7 @@ import { basename } from 'node:path';
 import { MTP_STATUS_TIMEOUT_SECONDS, MTP_TRANSFER_TIMEOUT_SECONDS } from '../../shared/constants';
 import { appError, type SwitchCatalogError } from '../../shared/errors/app-error';
 import type { AppErrorDto } from '../../shared/errors/codes';
+import type { Logger } from '../lifecycle/logger';
 import type {
   MtpAdapter,
   MtpCopyInput,
@@ -37,6 +38,7 @@ export interface PowerShellMtpAdapterOptions {
   run?: typeof runPowerShell;
   /** Overrides the transfer timeout (`MTP_TRANSFER_TIMEOUT_SECONDS`). */
   timeoutSeconds?: number;
+  logger?: Logger;
 }
 
 /**
@@ -50,6 +52,7 @@ export class PowerShellMtpAdapter implements MtpAdapter {
   private readonly runFn: typeof runPowerShell;
   private readonly statusTimeoutSeconds: number;
   private readonly transferTimeoutSeconds: number;
+  private readonly logger: Logger | undefined;
   private pendingStatus: Promise<MtpStatus> | null = null;
 
   constructor(options: PowerShellMtpAdapterOptions = {}) {
@@ -57,6 +60,7 @@ export class PowerShellMtpAdapter implements MtpAdapter {
     this.runFn = options.run ?? runPowerShell;
     this.statusTimeoutSeconds = MTP_STATUS_TIMEOUT_SECONDS;
     this.transferTimeoutSeconds = options.timeoutSeconds ?? MTP_TRANSFER_TIMEOUT_SECONDS;
+    this.logger = options.logger;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -142,6 +146,9 @@ export class PowerShellMtpAdapter implements MtpAdapter {
       throw appError('FILE_MISSING', `Source file is missing: ${input.sourcePath}`);
     }
     const timeoutSeconds = input.timeoutSeconds ?? this.transferTimeoutSeconds;
+    const report = { source: input.sourcePath, destination: input.destination.shellPath,
+      fileName };
+    this.logger?.info('transfer.started', report);
 
     input.onStateChange?.('preparing');
     let started: Promise<PowerShellResult>;
@@ -157,7 +164,10 @@ export class PowerShellMtpAdapter implements MtpAdapter {
         },
       });
     } catch (error) {
-      throw copyFailure(error, fileName, timeoutSeconds);
+      const failure = copyFailure(error, fileName, timeoutSeconds);
+      this.logger?.error('transfer.failed', { ...report, message: failure.message,
+        details: failure.details });
+      throw failure;
     }
     input.onStateChange?.('copying');
 
@@ -165,11 +175,20 @@ export class PowerShellMtpAdapter implements MtpAdapter {
     try {
       result = await started;
     } catch (error) {
-      throw copyFailure(error, fileName, timeoutSeconds);
+      const failure = copyFailure(error, fileName, timeoutSeconds);
+      this.logger?.error('transfer.failed', { ...report, message: failure.message,
+        details: failure.details });
+      throw failure;
     }
     if (result.code !== 0) {
-      throw appError('MTP_COPY_FAILED', `MTP transfer failed for '${fileName}': ${scriptMessage(result)}`);
+      const failure = appError('MTP_COPY_FAILED', `MTP transfer failed for '${fileName}': ${scriptMessage(result)}`,
+        { retryable: true, details: { exitCode: result.code,
+          stdout: result.stdout.slice(-8000), stderr: cleanPowerShellMessage(result.stderr).slice(-8000) } });
+      this.logger?.error('transfer.failed', { ...report, message: failure.message,
+        details: failure.details });
+      throw failure;
     }
+    this.logger?.info('transfer.completed', { ...report, output: result.stdout.slice(-8000) });
     input.onStateChange?.('completed');
   }
 
@@ -235,11 +254,16 @@ function copyFailure(error: unknown, fileName: string, timeoutSeconds: number): 
     return appError(
       'MTP_COPY_FAILED',
       `MTP transfer timed out for '${fileName}' after ${timeoutSeconds} seconds.`,
-      { retryable: true },
+      { retryable: true, details: { stdout: error.stdout.slice(-8000),
+        stderr: cleanPowerShellMessage(error.stderr).slice(-8000) } },
     );
   }
   const message = error instanceof Error ? error.message : String(error);
-  return appError('MTP_COPY_FAILED', `MTP transfer failed for '${fileName}': ${message}`);
+  return appError('MTP_COPY_FAILED', `MTP transfer failed for '${fileName}': ${message}`, {
+    retryable: true,
+    details: error instanceof PowerShellError ? { stdout: error.stdout.slice(-8000),
+      stderr: cleanPowerShellMessage(error.stderr).slice(-8000), exitCode: error.code } : undefined,
+  });
 }
 
 /** Python reported either stream's cleaned message, with a code fallback. */

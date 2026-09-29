@@ -1,11 +1,40 @@
-import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import { PowerShellMtpAdapter } from '@main/mtp/powershell-mtp.adapter';
 import type { PowerShellRunOptions } from '@main/mtp/powershell-runner';
 
 const scriptsDir = resolve(process.cwd(), 'resources', 'scripts');
 
 describe('PowerShell MTP inventory adapter', () => {
+  it('uses the restored single-file Shell script and logs copy failures', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'mtp-copy-'));
+    const sourcePath = join(folder, 'Base.nsp');
+    try {
+      writeFileSync(sourcePath, 'file');
+      const run = vi.fn(async (_options: PowerShellRunOptions) => ({ code: 1,
+        stdout: '', stderr: 'DBI stopped the transfer' }));
+      const logError = vi.fn();
+      const logger = { child: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: logError };
+      const adapter = new PowerShellMtpAdapter({ scriptsDir, run, logger });
+      await expect(adapter.copyFile({ sourcePath, fileName: 'Base.nsp', totalBytes: 4,
+        destination: { id: 'sd', name: 'SD install', label: 'SD install', shellPath: 'shell:::sd',
+          freeBytes: 100, totalBytes: 200 } })).rejects.toMatchObject({ code: 'MTP_COPY_FAILED',
+        details: { exitCode: 1, stderr: 'DBI stopped the transfer' } });
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(run.mock.calls[0]?.[0].env).toMatchObject({
+        SWITCH_CATALOG_MTP_SOURCE: sourcePath, SWITCH_CATALOG_MTP_DESTINATION: 'shell:::sd',
+      });
+      expect(run.mock.calls[0]?.[0].script).toContain('$dest.CopyHere($sourcePath, 16)');
+      expect(logError).toHaveBeenCalledWith('transfer.failed', expect.objectContaining({
+        source: sourcePath, details: expect.objectContaining({ stderr: 'DBI stopped the transfer' }),
+      }));
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
   it('parses a bounded, read-only installed-games listing', async () => {
     const received: PowerShellRunOptions[] = [];
     const adapter = new PowerShellMtpAdapter({ scriptsDir, run: async (options) => {

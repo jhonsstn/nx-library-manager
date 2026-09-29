@@ -125,7 +125,7 @@ Expose an interface such as:
 ```ts
 export interface MtpAdapter {
   listInstallDestinations(): Promise<MtpStorageInfo[]>;
-  copyFile(source: string, destination: MtpDestination, onProgress?: ProgressFn): Promise<void>;
+  copyFile(input: MtpCopyInput, signal?: AbortSignal): Promise<void>;
   isAvailable(): Promise<boolean>;
 }
 ```

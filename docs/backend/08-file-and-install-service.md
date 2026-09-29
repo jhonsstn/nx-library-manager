@@ -74,7 +74,8 @@ Statuses:
 - failed;
 - cancelled.
 
-Only one transfer is active at a time.
+Only one transfer is active at a time. MTP jobs are copied one file at a time
+through the Windows Shell. Each queue row is completed after its copy step.
 
 ## Queue recovery
 
@@ -107,7 +108,7 @@ If storage data is unavailable, allow the user to proceed but report that free s
 ## Failure behavior
 
 On individual failure:
-- mark current job failed;
+- mark the current job failed;
 - stop subsequent queue items by default;
 - let user retry failed/pending portion;
 - do not delete source files unless the current installation workflow explicitly requires moving rather than copying.

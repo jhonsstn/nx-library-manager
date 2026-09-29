@@ -100,8 +100,8 @@ function InstallJobRow({ job, busy, onCancel, onRetry }: InstallJobRowProps) {
   const percent = trackable ? Math.min(100, Math.round((job.transferredBytes / job.sizeBytes) * 100)) : null;
   const destination = job.destinationLabel || displayFolder(job.destinationFolder, job.destinationLabel ?? '');
   const statusLabel = job.destinationType !== 'folder' && job.status === 'completed'
-    ? 'Copy step finished' : job.destinationType !== 'folder' && job.status === 'running'
-      ? 'Copying to Switch' : STATUS_LABELS[job.status];
+    ? 'Transfer successful' : job.destinationType !== 'folder' && job.status === 'running'
+      ? 'Transferring to Switch' : STATUS_LABELS[job.status];
 
   return (
     <li className="list__item list__item--static install-tray__row">
@@ -120,9 +120,6 @@ function InstallJobRow({ job, busy, onCancel, onRetry }: InstallJobRowProps) {
             </span>
           </>
         )}
-        {job.destinationType !== 'folder' && job.status === 'completed' ? <small className="dim">
-          Check “On this Switch” to confirm DBI finished installing it.
-        </small> : null}
         {job.error ? <p className="error-text">{job.error.message}</p> : null}
       </div>
       {job.status === 'pending' ? (

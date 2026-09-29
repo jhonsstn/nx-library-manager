@@ -50,7 +50,6 @@ export interface InstallServiceOptions {
   /** Test seam for destination free space; `null` means "could not be verified". */
   freeSpace?: (folder: string) => Promise<number | null>;
   inventory?: () => MtpInventoryDto;
-  onMtpBatchFinished?: () => void;
 }
 
 /** One file scheduled for transfer, before it becomes an `install_jobs` row. */
@@ -81,7 +80,6 @@ export class InstallService {
   private readonly now: () => number;
   private readonly freeSpace: ((folder: string) => Promise<number | null>) | undefined;
   private readonly inventory: (() => MtpInventoryDto) | undefined;
-  private readonly onMtpBatchFinished: (() => void) | undefined;
 
   private activePump: Promise<void> | null = null;
   private activeLocalTransfer: { jobId: number; controller: AbortController } | null = null;
@@ -100,7 +98,6 @@ export class InstallService {
     this.now = options.now ?? Date.now;
     this.freeSpace = options.freeSpace;
     this.inventory = options.inventory;
-    this.onMtpBatchFinished = options.onMtpBatchFinished;
   }
 
   preview(input: PreviewInstallInput): InstallPreviewDto {
@@ -530,7 +527,6 @@ export class InstallService {
 
   /** Drains pending jobs in id order, one transfer at a time. Never rejects. */
   private async runPump(): Promise<void> {
-    let touchedMtp = false;
     try {
       for (;;) {
         if (this.stopQueue || this.shuttingDown) break;
@@ -544,7 +540,6 @@ export class InstallService {
           continue;
         }
         try {
-          if (job.destinationType !== 'folder') touchedMtp = true;
           await this.executeJob(job);
         } catch (error) {
           const dto = toAppErrorDto(error);
@@ -558,7 +553,6 @@ export class InstallService {
       this.logger?.error('install.queueFailed', { error: describeError(error) });
     } finally {
       if (!this.shuttingDown) this.stopQueue = false;
-      if (touchedMtp) this.onMtpBatchFinished?.();
     }
   }
 
@@ -627,6 +621,7 @@ export class InstallService {
         onStateChange,
       });
     } catch (error) {
+      if (error instanceof SwitchCatalogError) throw error;
       throw appError('MTP_COPY_FAILED', `${job.displayName}: ${describeError(error)}`, {
         retryable: true,
         cause: error,
@@ -690,6 +685,7 @@ export class InstallService {
       fileName: job.displayName,
       code: error.code,
       message: error.message,
+      details: error.details,
     });
   }
 

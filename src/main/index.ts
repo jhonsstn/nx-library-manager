@@ -146,7 +146,8 @@ function bootstrap(): void {
 
   const versions = new VersionService({ db, paths, logger: logger.child('versions') });
   versions.loadCached();
-  const mtpAdapter = new PowerShellMtpAdapter({ scriptsDir: resolveScriptsDir() });
+  const mtpAdapter = new PowerShellMtpAdapter({ scriptsDir: resolveScriptsDir(),
+    logger: logger.child('mtpTransfer') });
   const mtp = new MtpService({
     adapter: mtpAdapter,
     logger: logger.child('mtp'),
@@ -175,7 +176,6 @@ function bootstrap(): void {
     logger: logger.child('install'),
     onJobChanged: (job) => emit(EVENTS.installChanged, job),
     inventory: () => mtp.getInventory(),
-    onMtpBatchFinished: () => { void mtp.refreshInventory(); },
   });
   const files = new FileService({ db, logger: logger.child('files') });
   const metadata = new MetadataService({

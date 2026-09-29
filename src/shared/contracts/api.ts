@@ -124,6 +124,7 @@ export interface SwitchCatalogApi {
 
   files: {
     chooseDirectory(input?: ChooseDirectoryInput): Promise<string | null>;
+    openBaseGameFolder(gameId: number): Promise<void>;
     deleteFile(input: DeleteFileInput): Promise<DeleteFileResultDto>;
     cleanOldUpdates(gameId: number, preview: UpdateCleanupPreviewDto): Promise<UpdateCleanupResultDto>;
     moveFile(input: MoveFileInput): Promise<FileOperationResultDto>;
@@ -167,6 +168,7 @@ export interface SwitchCatalogApi {
     getPlatform(): Promise<string>;
     checkForUpdates(): Promise<AppUpdateStatusDto>;
     openExternal(url: string): Promise<void>;
+    openLogsFolder(): Promise<void>;
     onVersionsChanged(listener: () => void): Promise<() => void>;
     onShutdownStatus(listener: (event: ShutdownStatusDto) => void): Promise<() => void>;
   };

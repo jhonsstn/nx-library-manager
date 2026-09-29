@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BrowserWindow, dialog } from 'electron';
+import { BrowserWindow, dialog, shell } from 'electron';
 import { IPC } from '../../shared/contracts/ipc';
 import { SettingsUpdateSchema } from '../../shared/schemas/settings';
 import { OpenExternalInputSchema } from '../../shared/schemas/inputs';
@@ -8,6 +8,7 @@ import { handle } from './handle';
 import type { IpcDeps } from './deps';
 import { updateSettingsTransactional } from '../settings/update-settings';
 import { resolveScanInput } from './scan.ipc';
+import { appError } from '../../shared/errors/app-error';
 
 export function registerSettingsIpc(deps: IpcDeps): void {
   handle(IPC.settings.get, z.tuple([]), () => ({ ...deps.settings.load(), prodKeysConfigured: deps.prodKeys.available }));
@@ -52,4 +53,8 @@ export function registerAppIpc(deps: IpcDeps): void {
   handle(IPC.app.getPlatform, z.tuple([]), () => process.platform);
   handle(IPC.app.checkForUpdates, z.tuple([]), () => deps.appUpdate.checkLatestRelease());
   handle(IPC.app.openExternal, z.tuple([OpenExternalInputSchema]), (input) => openExternalUrl(input.url));
+  handle(IPC.app.openLogsFolder, z.tuple([]), async () => {
+    const failure = await shell.openPath(deps.paths.logsDir);
+    if (failure) throw appError('UNKNOWN_ERROR', `Could not open logs folder: ${failure}`);
+  });
 }

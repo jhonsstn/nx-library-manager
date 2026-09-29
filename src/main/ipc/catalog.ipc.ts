@@ -1,4 +1,6 @@
-import { BrowserWindow, dialog } from 'electron';
+import { existsSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { BrowserWindow, dialog, shell } from 'electron';
 import { z } from 'zod';
 import { IPC } from '../../shared/contracts/ipc';
 import {
@@ -13,6 +15,7 @@ import {
   UnmatchUpdatesInputSchema,
 } from '../../shared/schemas/inputs';
 import { appError } from '../../shared/errors/app-error';
+import { getBaseFile } from '../repositories/game-files.repository';
 import { handle } from './handle';
 import type { IpcDeps } from './deps';
 
@@ -64,6 +67,14 @@ export function registerFilesIpc(deps: IpcDeps): void {
   handle(IPC.files.chooseDirectory, z.tuple([ChooseDirectoryInputSchema.default({})]), (input) =>
     chooseDirectory(deps, input),
   );
+  handle(IPC.files.openBaseGameFolder, z.tuple([GameIdSchema]), async (gameId) => {
+    const baseFile = getBaseFile(deps.db, gameId);
+    if (!baseFile) throw appError('NOT_FOUND', `No base game file is recorded for game ${gameId}.`);
+    const folder = dirname(baseFile.filePath);
+    if (!existsSync(folder)) throw appError('FILE_MISSING', `Base game folder is missing: ${folder}`);
+    const error = await shell.openPath(folder);
+    if (error) throw appError('UNKNOWN_ERROR', `Could not open the base game folder: ${error}`);
+  });
   handle(IPC.files.deleteFile, z.tuple([DeleteFileInputSchema]), (input) => deps.files.deleteTrackedFile(input));
   handle(IPC.files.cleanOldUpdates, z.tuple([GameIdSchema, UpdateCleanupPreviewSchema]),
     (gameId, preview) => deps.files.cleanOldUpdates(gameId, preview));

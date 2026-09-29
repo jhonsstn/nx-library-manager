@@ -109,6 +109,7 @@ export function createSwitchCatalogApi(bridge: IpcBridge): SwitchCatalogApi {
     },
     files: {
       chooseDirectory: (input) => call<string | null>(IPC.files.chooseDirectory, [input]),
+      openBaseGameFolder: (gameId) => call<void>(IPC.files.openBaseGameFolder, [gameId]),
       deleteFile: (input) => call<DeleteFileResultDto>(IPC.files.deleteFile, [input]),
       cleanOldUpdates: (gameId, preview) => call<UpdateCleanupResultDto>(IPC.files.cleanOldUpdates, [gameId, preview]),
       moveFile: (input) => call<FileOperationResultDto>(IPC.files.moveFile, [input]),
@@ -147,6 +148,7 @@ export function createSwitchCatalogApi(bridge: IpcBridge): SwitchCatalogApi {
       getPlatform: () => call<string>(IPC.app.getPlatform),
       checkForUpdates: () => call<AppUpdateStatusDto>(IPC.app.checkForUpdates),
       openExternal: (url) => call<void>(IPC.app.openExternal, [url]),
+      openLogsFolder: () => call<void>(IPC.app.openLogsFolder),
       onVersionsChanged: async (listener) => on<void>(EVENTS.versionsChanged, listener),
       onShutdownStatus: async (listener) => on<ShutdownStatusDto>(EVENTS.shutdownStatusChanged, listener),
     },

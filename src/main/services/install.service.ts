@@ -66,8 +66,10 @@ interface QueueItem {
 /**
  * Persistent install queue for local-folder and MTP destinations.
  *
- * At most one transfer is active at a time. Consecutive MTP jobs for the same
- * destination share one Windows file operation; folder moves report bytes.
+ * At most one transfer is active at a time, so ordering and progress stay
+ * truthful: folder moves report real byte counts, while MTP transfers report
+ * state transitions only (`MtpTransferState`) because the PowerShell mechanism
+ * cannot measure bytes.
  */
 export class InstallService {
   private readonly db: AppDatabase;
@@ -523,7 +525,7 @@ export class InstallService {
     });
   }
 
-  /** Drains pending jobs in id order, batching consecutive MTP files. Never rejects. */
+  /** Drains pending jobs in id order, one transfer at a time. Never rejects. */
   private async runPump(): Promise<void> {
     try {
       for (;;) {
@@ -537,30 +539,13 @@ export class InstallService {
           );
           continue;
         }
-        if (job.destinationType !== 'folder') {
-          const batch = this.pendingMtpBatch(job);
-          const missing = batch.find((item) => !this.sourceExists(item.sourcePath));
-          if (missing) {
-            this.failJob(missing, appError('FILE_MISSING',
-              `Missing source file: ${missing.displayName} (${missing.sourcePath})`));
-            continue;
-          }
-          try {
-            await this.copyToMtp(batch);
-          } catch (error) {
-            const dto = toAppErrorDto(error);
-            for (const item of batch) this.failJob(item, dto);
-            break;
-          }
-        } else {
-          try {
-            await this.executeJob(job);
-          } catch (error) {
-            const dto = toAppErrorDto(error);
-            if (dto.code === 'JOB_CANCELLED') this.cancelJob(job, dto);
-            else this.failJob(job, dto);
-            break; // spec 08: a failed transfer stops the rest of the queue
-          }
+        try {
+          await this.executeJob(job);
+        } catch (error) {
+          const dto = toAppErrorDto(error);
+          if (dto.code === 'JOB_CANCELLED') this.cancelJob(job, dto);
+          else this.failJob(job, dto);
+          break; // spec 08: a failed transfer stops the rest of the queue
         }
         if (this.stopQueue || this.shuttingDown) break;
       }
@@ -575,16 +560,6 @@ export class InstallService {
     return listJobsByStatus(this.db, ['pending'])[0] ?? null;
   }
 
-  private pendingMtpBatch(first: InstallJobDto): InstallJobDto[] {
-    const batch: InstallJobDto[] = [];
-    for (const job of listJobsByStatus(this.db, ['pending'])) {
-      if (job.id < first.id) continue;
-      if (job.destinationType !== first.destinationType || job.destinationFolder !== first.destinationFolder) break;
-      batch.push(job);
-    }
-    return batch;
-  }
-
   private async executeJob(job: InstallJobDto): Promise<void> {
     this.updateStatus(job.id, { status: 'running' });
     this.logger?.info('install.itemStarted', {
@@ -593,7 +568,8 @@ export class InstallService {
       destinationType: job.destinationType,
       sizeBytes: job.sizeBytes,
     });
-    await this.moveToFolder(job);
+    if (job.destinationType === 'folder') await this.moveToFolder(job);
+    else await this.copyToMtp(job);
   }
 
   /** Folder install: real move, then the catalog rows follow the file. */
@@ -630,36 +606,30 @@ export class InstallService {
     }
   }
 
-  private async copyToMtp(jobs: InstallJobDto[]): Promise<void> {
-    const storage = await this.requireMtpStorage(jobs[0]);
-    for (const job of jobs) {
-      this.updateStatus(job.id, { status: 'running' });
-      this.logger?.info('install.itemStarted', {
-        installJobId: job.id, fileName: job.displayName,
-        destinationType: job.destinationType, sizeBytes: job.sizeBytes,
-      });
-    }
+  private async copyToMtp(job: InstallJobDto): Promise<void> {
+    const storage = await this.requireMtpStorage(job);
     const onStateChange = (state: MtpTransferState): void => {
-      this.logger?.debug('install.mtpState', { installJobIds: jobs.map((job) => job.id), state });
+      this.logger?.debug('install.mtpState', { installJobId: job.id, fileName: job.displayName, state });
     };
     try {
-      await this.mtp.copyFiles({
-        files: jobs.map((job) => ({ sourcePath: job.sourcePath,
-          fileName: job.displayName, totalBytes: job.sizeBytes })),
+      await this.mtp.copyFile({
+        sourcePath: job.sourcePath,
         destination: storage,
-        timeoutSeconds: MTP_TRANSFER_TIMEOUT_SECONDS * jobs.length,
+        fileName: job.displayName,
+        totalBytes: job.sizeBytes,
+        timeoutSeconds: MTP_TRANSFER_TIMEOUT_SECONDS,
         onStateChange,
       });
     } catch (error) {
       if (error instanceof SwitchCatalogError) throw error;
-      throw appError('MTP_COPY_FAILED', `MTP batch transfer failed: ${describeError(error)}`, {
+      throw appError('MTP_COPY_FAILED', `${job.displayName}: ${describeError(error)}`, {
         retryable: true,
         cause: error,
       });
     }
-    // The Windows operation has finished; the DBI installed-games inventory
-    // may remain stale until its MTP responder is restarted.
-    for (const job of jobs) this.finishJob(job, null, job.sizeBytes);
+    // The PowerShell handoff cannot report bytes; the completed size is the
+    // only honest figure and the source file stays where it is.
+    this.finishJob(job, null, job.sizeBytes);
   }
 
   /**

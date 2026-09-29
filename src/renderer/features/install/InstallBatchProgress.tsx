@@ -24,7 +24,7 @@ export function InstallBatchProgress({ jobs, onClose }: InstallBatchProgressProp
     `MTP transfer failed at ${new Date().toISOString()}`,
     `Error: ${failed.error?.code ?? 'UNKNOWN_ERROR'}: ${failed.error?.message ?? 'Transfer did not finish.'}`,
     `Destination: ${failed.destinationLabel ?? failed.destinationFolder}`,
-    ...jobs.map((job) => `Source: ${job.sourcePath}`),
+    ...current.map((job) => `Source (${job.status}): ${job.sourcePath}`),
     `Details: ${JSON.stringify(failed.error?.details ?? {}, null, 2)}`,
   ].join('\n') : '';
 

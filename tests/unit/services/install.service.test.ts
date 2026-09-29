@@ -8,7 +8,7 @@ import { closeDatabase, openDatabase, type AppDatabase } from '@main/db/database
 import { runMigrations } from '@main/db/migrations';
 import type {
   MtpAdapter,
-  MtpCopyBatchInput,
+  MtpCopyInput,
   MtpStatus,
   MtpStorageDestination,
   MtpTransferState,
@@ -54,7 +54,6 @@ class FakeMtpAdapter implements MtpAdapter {
   storages: MtpStorageDestination[] = [];
   started: string[] = [];
   completed: string[] = [];
-  batches: string[][] = [];
   states: MtpTransferState[] = [];
   failOn: string | null = null;
   /** When true every copy blocks until `release()` is called. */
@@ -64,7 +63,7 @@ class FakeMtpAdapter implements MtpAdapter {
 
   private readonly gates: Array<() => void> = [];
 
-  private notify(input: MtpCopyBatchInput, state: MtpTransferState): void {
+  private notify(input: MtpCopyInput, state: MtpTransferState): void {
     this.states.push(state);
     input.onStateChange?.(state);
   }
@@ -92,10 +91,8 @@ class FakeMtpAdapter implements MtpAdapter {
       unidentifiedFiles: 0, message: 'No installed-games view.' };
   }
 
-  async copyFiles(input: MtpCopyBatchInput): Promise<void> {
-    const names = input.files.map((file) => file.fileName);
-    this.batches.push(names);
-    this.started.push(...names);
+  async copyFile(input: MtpCopyInput): Promise<void> {
+    this.started.push(input.fileName);
     this.active += 1;
     this.maxActive = Math.max(this.maxActive, this.active);
     this.notify(input, 'preparing');
@@ -104,9 +101,9 @@ class FakeMtpAdapter implements MtpAdapter {
       // Yielding lets a non-serialized pump show up in `maxActive`.
       else await Promise.resolve();
       this.notify(input, 'copying');
-      if (this.failOn && names.includes(this.failOn)) throw new Error(`copy failed: ${this.failOn}`);
+      if (this.failOn === input.fileName) throw new Error(`copy failed: ${input.fileName}`);
       this.notify(input, 'completed');
-      this.completed.push(...names);
+      this.completed.push(input.fileName);
     } finally {
       this.active -= 1;
     }
@@ -440,7 +437,7 @@ describe('install validation', () => {
 });
 
 describe('install queue execution', () => {
-  it('runs selected MTP files in one batch and reports bytes only on completion', async () => {
+  it('runs MTP transfers one at a time and reports bytes only on completion', async () => {
     const { gameId, base, early, late } = seedLibrary();
     adapter.storages = [SD_STORAGE];
     const service = createService();
@@ -453,7 +450,6 @@ describe('install queue execution', () => {
     await service.whenIdle();
 
     expect(adapter.started).toEqual([BASE_NAME, EARLY_UPDATE_NAME, LATE_UPDATE_NAME]);
-    expect(adapter.batches).toEqual([[BASE_NAME, EARLY_UPDATE_NAME, LATE_UPDATE_NAME]]);
     expect(adapter.maxActive).toBe(1);
     expect(adapter.completed).toEqual(adapter.started);
     expect(adapter.states.slice(0, 3)).toEqual(['preparing', 'copying', 'completed']);
@@ -467,7 +463,7 @@ describe('install queue execution', () => {
     expect(existsSync(early.path)).toBe(true);
   });
 
-  it('marks a failed batch as failed without claiming partial success', async () => {
+  it('marks a failed transfer failed and leaves the rest of the queue pending', async () => {
     const { gameId, base, early, late } = seedLibrary();
     adapter.storages = [SD_STORAGE];
     adapter.failOn = EARLY_UPDATE_NAME;
@@ -480,12 +476,12 @@ describe('install queue execution', () => {
     });
     await service.whenIdle();
 
-    expect(adapter.started).toEqual([BASE_NAME, EARLY_UPDATE_NAME, LATE_UPDATE_NAME]);
-    expect(getInstallJob(db, jobs[0].id)!.status).toBe('failed');
+    expect(adapter.started).toEqual([BASE_NAME, EARLY_UPDATE_NAME]);
+    expect(getInstallJob(db, jobs[0].id)!.status).toBe('completed');
     const failed = getInstallJob(db, jobs[1].id)!;
     expect(failed.status).toBe('failed');
     expect(failed.error).toMatchObject({ code: 'MTP_COPY_FAILED', retryable: true });
-    expect(getInstallJob(db, jobs[2].id)!.status).toBe('failed');
+    expect(getInstallJob(db, jobs[2].id)!.status).toBe('pending');
     // MTP copies never consume the local source, even on failure.
     expect(existsSync(base.path)).toBe(true);
   });
@@ -640,7 +636,7 @@ describe('install queue recovery', () => {
     expect(service.getJobs().filter((job) => job.sourcePath === gonePath)).toHaveLength(1);
   });
 
-  it('cannot cancel a file in a running MTP batch', async () => {
+  it('cancels a queued job but never a running MTP transfer', async () => {
     const { gameId, early, late } = seedLibrary();
     adapter.storages = [SD_STORAGE];
     adapter.hold = true;
@@ -651,10 +647,10 @@ describe('install queue recovery', () => {
       updateIds: [early.id, late.id],
       destination: MTP_DESTINATION('sd'),
     });
-    await vi.waitFor(() => expect(adapter.started).toEqual([BASE_NAME, EARLY_UPDATE_NAME, LATE_UPDATE_NAME]));
+    await vi.waitFor(() => expect(adapter.started).toEqual([BASE_NAME]));
 
     await service.cancel(jobs[2].id);
-    expect(getInstallJob(db, jobs[2].id)!.status).toBe('running');
+    expect(getInstallJob(db, jobs[2].id)!.status).toBe('cancelled');
 
     await service.cancel(jobs[0].id);
     expect(getInstallJob(db, jobs[0].id)!.status).toBe('running');
@@ -665,8 +661,8 @@ describe('install queue recovery', () => {
 
     expect(getInstallJob(db, jobs[0].id)!.status).toBe('completed');
     expect(getInstallJob(db, jobs[1].id)!.status).toBe('completed');
-    expect(getInstallJob(db, jobs[2].id)!.status).toBe('completed');
-    expect(adapter.batches).toEqual([[BASE_NAME, EARLY_UPDATE_NAME, LATE_UPDATE_NAME]]);
+    expect(getInstallJob(db, jobs[2].id)!.status).toBe('cancelled');
+    expect(adapter.started).toEqual([BASE_NAME, EARLY_UPDATE_NAME]);
 
     await expect(service.cancel(99_999)).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
@@ -723,7 +719,7 @@ describe('install service shutdown', () => {
     expect(existsSync(early.path)).toBe(true);
   });
 
-  it('lets a running batch finish before shutdown', async () => {
+  it('lets a running transfer finish and stops the rest of the queue', async () => {
     const { gameId, early, late } = seedLibrary();
     adapter.storages = [SD_STORAGE];
     adapter.hold = true;
@@ -734,7 +730,7 @@ describe('install service shutdown', () => {
       updateIds: [early.id, late.id],
       destination: MTP_DESTINATION('sd'),
     });
-    await vi.waitFor(() => expect(adapter.started).toEqual([BASE_NAME, EARLY_UPDATE_NAME, LATE_UPDATE_NAME]));
+    await vi.waitFor(() => expect(adapter.started).toEqual([BASE_NAME]));
 
     service.shutdown();
     expect(getInstallJob(db, jobs[0].id)!.status).toBe('running');
@@ -744,9 +740,9 @@ describe('install service shutdown', () => {
     await service.whenIdle();
 
     expect(getInstallJob(db, jobs[0].id)!.status).toBe('completed');
-    expect(getInstallJob(db, jobs[1].id)!.status).toBe('completed');
-    expect(getInstallJob(db, jobs[2].id)!.status).toBe('completed');
-    expect(adapter.batches).toEqual([[BASE_NAME, EARLY_UPDATE_NAME, LATE_UPDATE_NAME]]);
+    expect(getInstallJob(db, jobs[1].id)!.status).toBe('pending');
+    expect(getInstallJob(db, jobs[2].id)!.status).toBe('pending');
+    expect(adapter.started).toEqual([BASE_NAME]);
   });
 });
 

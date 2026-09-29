@@ -103,13 +103,10 @@ describe('readScript', () => {
     expect(list).toContain('Normalize-StorageName');
     expect(list.trimEnd().endsWith('$rows | ConvertTo-Json -Compress')).toBe(true);
 
-    const copy = readScript('mtp-copy-files.ps1', { scriptsDir: REPO_SCRIPTS });
+    const copy = readScript('mtp-copy-file.ps1', { scriptsDir: REPO_SCRIPTS });
     expect(copy).toContain('$env:SWITCH_CATALOG_MTP_DESTINATION');
-    expect(copy).toContain('$env:SWITCH_CATALOG_MTP_SOURCE_COUNT');
-    expect(copy).toContain('GetEnvironmentVariable("SWITCH_CATALOG_MTP_SOURCE_$index")');
-    expect(copy).toContain('operation.CopyItem');
-    expect(copy).toContain('operation.PerformOperations');
-    expect(copy).toContain('operation.GetAnyOperationsAborted');
+    expect(copy).toContain('$env:SWITCH_CATALOG_MTP_SOURCE');
+    expect(copy).toContain('$dest.CopyHere($sourcePath, 16)');
 
     const picker = readScript('mtp-pick-folder.ps1', { scriptsDir: REPO_SCRIPTS });
     expect(picker).toContain('$env:SWITCH_CATALOG_MTP_PICKER_TITLE');

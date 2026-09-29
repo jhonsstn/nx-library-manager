@@ -11,7 +11,7 @@ All MTP functionality must sit behind `MtpAdapter`.
 ```ts
 interface MtpAdapter {
   getStatus(): Promise<MtpStatus>;
-  copyFiles(input: MtpCopyBatchInput, signal?: AbortSignal): Promise<void>;
+  copyFile(input: MtpCopyInput, signal?: AbortSignal): Promise<void>;
 }
 ```
 
@@ -31,7 +31,7 @@ powershell.exe
 -EncodedCommand <controlled script>
 ```
 
-Each file path is passed in a separate child environment variable rather than interpolated into shell source.
+The source path is passed in a child environment variable rather than interpolated into shell source.
 
 ## Device detection
 
@@ -70,8 +70,8 @@ Requirements:
 - resolve MTP destination from adapter status rather than renderer text;
 - surface timeout/failure;
 - preserve filename;
-- submit selected files for one destination through one Windows file operation;
-- mark transfer success when Windows reports that operation finished, without
+- copy selected files one at a time through the Windows Shell;
+- mark transfer success after the Shell copy wait finishes, without
   scanning DBI's installed-games view afterward.
 
 ## Timeouts

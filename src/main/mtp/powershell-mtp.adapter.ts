@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs';
+import { basename } from 'node:path';
 import { MTP_STATUS_TIMEOUT_SECONDS, MTP_TRANSFER_TIMEOUT_SECONDS } from '../../shared/constants';
 import { appError, type SwitchCatalogError } from '../../shared/errors/app-error';
 import type { AppErrorDto } from '../../shared/errors/codes';
 import type { Logger } from '../lifecycle/logger';
 import type {
   MtpAdapter,
-  MtpCopyBatchInput,
+  MtpCopyInput,
   MtpInstalledListing,
   MtpStatus,
   MtpStorageDestination,
@@ -26,7 +27,7 @@ import {
 } from './powershell-runner';
 
 const STATUS_SCRIPT = 'mtp-list-storage.ps1';
-const COPY_SCRIPT = 'mtp-copy-files.ps1';
+const COPY_SCRIPT = 'mtp-copy-file.ps1';
 const PICKER_SCRIPT = 'mtp-pick-folder.ps1';
 const INSTALLED_SCRIPT = 'mtp-list-installed.ps1';
 
@@ -136,19 +137,17 @@ export class PowerShellMtpAdapter implements MtpAdapter {
     };
   }
 
-  async copyFiles(input: MtpCopyBatchInput, signal?: AbortSignal): Promise<void> {
-    if (input.files.length === 0) return;
+  async copyFile(input: MtpCopyInput, signal?: AbortSignal): Promise<void> {
+    const fileName = input.fileName || basename(input.sourcePath);
     if (signal?.aborted) {
-      throw appError('JOB_CANCELLED', 'MTP transfer was cancelled before it started.');
+      throw appError('JOB_CANCELLED', `MTP transfer of '${fileName}' was cancelled before it started.`);
     }
-    for (const file of input.files) {
-      if (!existsSync(file.sourcePath)) {
-        throw appError('FILE_MISSING', `Source file is missing: ${file.sourcePath}`);
-      }
+    if (!existsSync(input.sourcePath)) {
+      throw appError('FILE_MISSING', `Source file is missing: ${input.sourcePath}`);
     }
     const timeoutSeconds = input.timeoutSeconds ?? this.transferTimeoutSeconds;
-    const report = { destination: input.destination.shellPath,
-      sources: input.files.map((file) => file.sourcePath) };
+    const report = { source: input.sourcePath, destination: input.destination.shellPath,
+      fileName };
     this.logger?.info('transfer.started', report);
 
     input.onStateChange?.('preparing');
@@ -160,14 +159,12 @@ export class PowerShellMtpAdapter implements MtpAdapter {
         timeoutMs: Math.round(timeoutSeconds * 1000),
         env: {
           SWITCH_CATALOG_MTP_DESTINATION: input.destination.shellPath,
-          SWITCH_CATALOG_MTP_SOURCE_COUNT: String(input.files.length),
-          SWITCH_CATALOG_MTP_TIMEOUT: String(this.transferTimeoutSeconds),
-          ...Object.fromEntries(input.files.map((file, index) =>
-            [`SWITCH_CATALOG_MTP_SOURCE_${index}`, file.sourcePath])),
+          SWITCH_CATALOG_MTP_SOURCE: input.sourcePath,
+          SWITCH_CATALOG_MTP_TIMEOUT: String(timeoutSeconds),
         },
       });
     } catch (error) {
-      const failure = copyFailure(error, timeoutSeconds);
+      const failure = copyFailure(error, fileName, timeoutSeconds);
       this.logger?.error('transfer.failed', { ...report, message: failure.message,
         details: failure.details });
       throw failure;
@@ -178,13 +175,13 @@ export class PowerShellMtpAdapter implements MtpAdapter {
     try {
       result = await started;
     } catch (error) {
-      const failure = copyFailure(error, timeoutSeconds);
+      const failure = copyFailure(error, fileName, timeoutSeconds);
       this.logger?.error('transfer.failed', { ...report, message: failure.message,
         details: failure.details });
       throw failure;
     }
     if (result.code !== 0) {
-      const failure = appError('MTP_COPY_FAILED', `MTP batch transfer failed: ${scriptMessage(result)}`,
+      const failure = appError('MTP_COPY_FAILED', `MTP transfer failed for '${fileName}': ${scriptMessage(result)}`,
         { retryable: true, details: { exitCode: result.code,
           stdout: result.stdout.slice(-8000), stderr: cleanPowerShellMessage(result.stderr).slice(-8000) } });
       this.logger?.error('transfer.failed', { ...report, message: failure.message,
@@ -252,19 +249,21 @@ function statusFailureMessage(error: unknown, seconds: number): string {
   return `Could not read Switch MTP storage: ${error instanceof Error ? error.message : String(error)}`;
 }
 
-function copyFailure(error: unknown, timeoutSeconds: number): SwitchCatalogError {
+function copyFailure(error: unknown, fileName: string, timeoutSeconds: number): SwitchCatalogError {
   if (error instanceof PowerShellError && error.timedOut) {
     return appError(
       'MTP_COPY_FAILED',
-      `MTP batch transfer timed out after ${timeoutSeconds} seconds.`,
+      `MTP transfer timed out for '${fileName}' after ${timeoutSeconds} seconds.`,
       { retryable: true, details: { stdout: error.stdout.slice(-8000),
         stderr: cleanPowerShellMessage(error.stderr).slice(-8000) } },
     );
   }
   const message = error instanceof Error ? error.message : String(error);
-  return appError('MTP_COPY_FAILED', `MTP batch transfer failed: ${message}`, { retryable: true,
+  return appError('MTP_COPY_FAILED', `MTP transfer failed for '${fileName}': ${message}`, {
+    retryable: true,
     details: error instanceof PowerShellError ? { stdout: error.stdout.slice(-8000),
-      stderr: cleanPowerShellMessage(error.stderr).slice(-8000), exitCode: error.code } : undefined });
+      stderr: cleanPowerShellMessage(error.stderr).slice(-8000), exitCode: error.code } : undefined,
+  });
 }
 
 /** Python reported either stream's cleaned message, with a code fallback. */
